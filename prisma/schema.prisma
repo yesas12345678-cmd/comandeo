@@ -1,0 +1,79 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Tenant {
+  id         String     @id @default(uuid())
+  name       String
+  slug       String     @unique // El subdominio para la URL (ej: "barpaco")
+  apiKey     String     @unique @default(uuid()) // Token secreto para el agente de impresión
+  createdAt  DateTime   @default(now())
+  categories Category[]
+  products   Product[]
+  tables     Table[]
+  orders     Order[]
+  printJobs  PrintJob[]
+}
+
+model Category {
+  id       String    @id @default(uuid())
+  name     String
+  tenantId String
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@unique([tenantId, name]) // El nombre de categoría es único dentro de cada bar
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  price       Float
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+enum TableStatus {
+  FREE
+  BUSY
+}
+
+model Table {
+  id       String      @id @default(uuid())
+  number   Int
+  status   TableStatus @default(FREE)
+  orders   Order[]
+  tenantId String
+  tenant   Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, number]) // El número de mesa es único dentro de cada bar
+}
+
+model Order {
+  id        String   @id @default(uuid())
+  tableId   String
+  table     Table    @relation(fields: [tableId], references: [id])
+  items     Json
+  total     Float
+  createdAt DateTime @default(now())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model PrintJob {
+  id        String   @id @default(uuid())
+  tableNum  Int
+  items     Json
+  total     Float
+  printed   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
