@@ -27,10 +27,11 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { tableId, items, total } = body as {
+    const { tableId, items, total, waiterId } = body as {
       tableId: string;
       items: OrderItem[];
       total: number;
+      waiterId?: string;
     };
 
     if (!tableId || !items || items.length === 0 || total === undefined) {
@@ -57,6 +58,7 @@ export async function POST(request: Request) {
           items: items as any,
           total,
           tenantId: tenant.id,
+          waiterId: waiterId || null, // Guardar la asociación del camarero
         },
         include: {
           table: true,

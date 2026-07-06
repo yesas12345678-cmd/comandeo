@@ -47,7 +47,11 @@ export async function GET(request: Request) {
       });
     }
 
-    return NextResponse.json({ success: true, jobs: pendingJobs }, { status: 200 });
+    return NextResponse.json({
+      success: true,
+      jobs: pendingJobs,
+      tenantName: tenant.name // Retornamos el nombre del bar para el ticket
+    }, { status: 200 });
   } catch (error: any) {
     console.error('Error al obtener cola de impresión:', error);
     return NextResponse.json(

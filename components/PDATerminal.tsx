@@ -18,14 +18,30 @@ interface Table {
   status: 'FREE' | 'BUSY';
 }
 
+interface Waiter {
+  id: string;
+  name: string;
+}
+
 export default function PDATerminal() {
   const [products, setProducts] = useState<Product[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
+  const [waiters, setWaiters] = useState<Waiter[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedTableId, setSelectedTableId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [tenantName, setTenantName] = useState('PDA Camarero');
+
+  // Estados de autenticación del camarero
+  const [currentWaiter, setCurrentWaiter] = useState<Waiter | null>(null);
+  const [selectedWaiterId, setSelectedWaiterId] = useState<string>('');
+  const [pinInput, setPinInput] = useState<string>('');
+
+  // Estados del desglose de cuenta
+  const [billDetails, setBillDetails] = useState<{ items: any[]; total: number } | null>(null);
+  const [isBillLoading, setIsBillLoading] = useState(false);
 
   // Cargar datos iniciales desde la base de datos
   useEffect(() => {
@@ -36,6 +52,11 @@ export default function PDATerminal() {
         if (data.success) {
           setProducts(data.products);
           setTables(data.tables);
+          setTenantName(data.tenantName);
+          setWaiters(data.waiters);
+          if (data.waiters.length > 0) {
+            setSelectedWaiterId(data.waiters[0].id);
+          }
           if (data.tables.length > 0) {
             setSelectedTableId(data.tables[0].id);
           }
@@ -50,6 +71,36 @@ export default function PDATerminal() {
     }
     loadData();
   }, []);
+
+  // Cargar la cuenta de la mesa cuando cambia la selección o los estados de las mesas
+  useEffect(() => {
+    if (!selectedTableId) return;
+    const selected = tables.find((t) => t.id === selectedTableId);
+    
+    if (selected && selected.status === 'BUSY') {
+      fetchBillDetails(selected.id);
+    } else {
+      setBillDetails(null);
+    }
+  }, [selectedTableId, tables]);
+
+  // Consulta de desglose a la API
+  const fetchBillDetails = async (tableId: string) => {
+    try {
+      setIsBillLoading(true);
+      const res = await fetch(`/api/tables/${tableId}/bill`);
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setBillDetails({ items: data.items, total: data.total });
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Error al obtener cuenta.' });
+      }
+    } catch (err) {
+      console.error('Error fetching bill:', err);
+    } finally {
+      setIsBillLoading(false);
+    }
+  };
 
   const addToCart = (product: Product) => {
     setCart((prevCart) => {
@@ -73,8 +124,60 @@ export default function PDATerminal() {
 
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
+  // Obtener el objeto de la mesa seleccionada actualmente
+  const selectedTable = tables.find((t) => t.id === selectedTableId);
+
+  // Procesar las pulsaciones del teclado numérico PIN
+  const handleKeypadPress = (val: string) => {
+    setMessage(null);
+    if (val === 'clear') {
+      setPinInput('');
+      return;
+    }
+    if (val === 'delete') {
+      setPinInput((prev) => prev.slice(0, -1));
+      return;
+    }
+    if (pinInput.length < 4) {
+      const newPin = pinInput + val;
+      setPinInput(newPin);
+      
+      // Auto-enviar el PIN al llegar a 4 dígitos
+      if (newPin.length === 4) {
+        submitLogin(newPin);
+      }
+    }
+  };
+
+  // Enviar credenciales a la API de inicio de sesión
+  const submitLogin = async (pinCode: string) => {
+    if (!selectedWaiterId) return;
+    setIsSending(true);
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ waiterId: selectedWaiterId, pin: pinCode }),
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setCurrentWaiter(data.waiter);
+        setPinInput('');
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Código PIN incorrecto.' });
+        setPinInput('');
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Error al verificar credenciales.' });
+      setPinInput('');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  // Enviar comanda a la base de datos
   const sendOrderToKitchen = async () => {
-    if (cart.length === 0 || !selectedTableId) return;
+    if (cart.length === 0 || !selectedTableId || !currentWaiter) return;
     setIsSending(true);
     setMessage(null);
 
@@ -88,6 +191,7 @@ export default function PDATerminal() {
           tableId: selectedTableId,
           items: cart,
           total,
+          waiterId: currentWaiter.id,
         }),
       });
 
@@ -96,6 +200,11 @@ export default function PDATerminal() {
       if (response.ok && data.success) {
         setMessage({ type: 'success', text: `¡Comanda enviada con éxito a cocina!` });
         setCart([]);
+        
+        // Actualizar el estado de la mesa local a BUSY
+        setTables((prevTables) =>
+          prevTables.map((t) => (t.id === selectedTableId ? { ...t, status: 'BUSY' } : t))
+        );
       } else {
         setMessage({ 
           type: 'error', 
@@ -104,6 +213,44 @@ export default function PDATerminal() {
       }
     } catch (err) {
       setMessage({ type: 'error', text: 'Error de red o servidor al enviar comanda.' });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  // Cobrar y liberar mesa (Checkout)
+  const checkoutTable = async (method: 'CASH' | 'CARD') => {
+    if (!selectedTableId) return;
+    setIsSending(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch('/api/tables/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ tableId: selectedTableId, paymentMethod: method }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setMessage({ 
+          type: 'success', 
+          text: `Mesa cobrada en ${method === 'CASH' ? 'EFECTIVO' : 'TARJETA'} y liberada.` 
+        });
+        
+        // Actualizar el estado local de la mesa a FREE
+        setTables((prevTables) =>
+          prevTables.map((t) => (t.id === selectedTableId ? { ...t, status: 'FREE' } : t))
+        );
+        setBillDetails(null);
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Fallo al procesar el cobro.' });
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Error al conectar con el servidor.' });
     } finally {
       setIsSending(false);
     }
@@ -118,28 +265,116 @@ export default function PDATerminal() {
     );
   }
 
-  return (
-    <div className="flex flex-col min-h-screen bg-slate-900 text-slate-100 font-sans max-w-md mx-auto shadow-2xl">
-      <header className="bg-blue-600 px-4 py-3 flex items-center justify-between shadow-md">
-        <h1 className="text-xl font-bold tracking-tight">PDA Camarero</h1>
-        <div className="flex items-center gap-2">
-          <label htmlFor="table-select" className="text-sm font-semibold">Mesa:</label>
+  // PANTALLA DE BLOQUEO / TECLADO PIN
+  if (!currentWaiter) {
+    return (
+      <div className="flex flex-col min-h-screen bg-slate-900 text-slate-100 font-sans max-w-md mx-auto shadow-2xl p-6 justify-center">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-black tracking-tight text-white mb-1">{tenantName}</h1>
+          <p className="text-blue-400 font-extrabold uppercase text-xs tracking-widest">Acceso Camarero</p>
+        </div>
+
+        {message && (
+          <div className="p-3 rounded-xl text-sm font-semibold text-center bg-rose-500/20 text-rose-400 mb-6">
+            {message.text}
+          </div>
+        )}
+
+        {/* Listado de Camareros del Bar */}
+        <div className="mb-6">
+          <label htmlFor="waiter-select" className="text-slate-400 text-xs uppercase font-extrabold block mb-2 text-center tracking-wider">
+            Selecciona tu Nombre
+          </label>
           <select
-            id="table-select"
-            value={selectedTableId}
-            onChange={(e) => setSelectedTableId(e.target.value)}
-            className="bg-blue-700 text-white rounded px-2 py-1 font-bold outline-none focus:ring-2 focus:ring-blue-300"
+            id="waiter-select"
+            value={selectedWaiterId}
+            onChange={(e) => {
+              setSelectedWaiterId(e.target.value);
+              setMessage(null);
+            }}
+            className="w-full bg-slate-800 text-white rounded-xl border border-slate-700/60 px-4 py-3 font-extrabold text-center outline-none focus:ring-2 focus:ring-blue-500 text-lg shadow-md"
           >
-            {tables.map((table) => (
-              <option key={table.id} value={table.id}>
-                #{table.number}
+            {waiters.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
               </option>
             ))}
           </select>
         </div>
+
+        {/* Indicador de PIN */}
+        <div className="flex justify-center gap-4 mb-8">
+          {[0, 1, 2, 3].map((idx) => (
+            <div
+              key={idx}
+              className={`w-5 h-5 rounded-full border-2 transition-all duration-150 ${
+                pinInput.length > idx
+                  ? 'bg-blue-500 border-blue-400 scale-110 shadow-md'
+                  : 'bg-transparent border-slate-700'
+              }`}
+            />
+          ))}
+        </div>
+
+        {/* Teclado Numérico Visual */}
+        <div className="grid grid-cols-3 gap-4 max-w-[280px] mx-auto">
+          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((num) => (
+            <button
+              key={num}
+              onClick={() => handleKeypadPress(num)}
+              className="w-16 h-16 rounded-full bg-slate-800 hover:bg-slate-755 active:scale-95 text-2xl font-black text-white flex items-center justify-center border border-slate-700/60 shadow transition-all"
+            >
+              {num}
+            </button>
+          ))}
+          <button
+            onClick={() => handleKeypadPress('clear')}
+            className="w-16 h-16 rounded-full bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 text-xs font-bold text-rose-450 flex items-center justify-center border border-rose-500/20 transition-all uppercase"
+          >
+            Limpiar
+          </button>
+          <button
+            onClick={() => handleKeypadPress('0')}
+            className="w-16 h-16 rounded-full bg-slate-800 hover:bg-slate-755 active:scale-95 text-2xl font-black text-white flex items-center justify-center border border-slate-700/60 shadow transition-all"
+          >
+            0
+          </button>
+          <button
+            onClick={() => handleKeypadPress('delete')}
+            className="w-16 h-16 rounded-full bg-slate-800/40 hover:bg-slate-700/45 active:scale-95 text-lg font-black text-slate-400 flex items-center justify-center border border-slate-700/30 transition-all"
+          >
+            ⌫
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // PANTALLA PRINCIPAL / COMANDERO
+  return (
+    <div className="flex flex-col min-h-screen bg-slate-900 text-slate-100 font-sans max-w-md mx-auto shadow-2xl">
+      {/* Cabecera */}
+      <header className="bg-blue-600 px-4 py-3 flex items-center justify-between shadow-md">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight">{tenantName}</h1>
+          <p className="text-[10px] text-blue-200 font-extrabold uppercase tracking-wider mt-0.5">
+            Camarero: {currentWaiter.name}
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            setCurrentWaiter(null);
+            setMessage(null);
+          }}
+          className="px-3 py-1.5 bg-blue-750 hover:bg-blue-800 text-white rounded-lg text-xs font-black uppercase tracking-wider transition-colors shadow-inner"
+        >
+          Bloquear
+        </button>
       </header>
 
+      {/* Contenido Principal */}
       <main className="flex-1 p-4 flex flex-col gap-4 overflow-y-auto">
+        {/* Notificaciones */}
         {message && (
           <div
             className={`p-3 rounded-lg text-sm font-semibold text-center animate-pulse ${
@@ -150,6 +385,92 @@ export default function PDATerminal() {
           </div>
         )}
 
+        {/* Cuadrícula Visual de Mesas */}
+        <div>
+          <h2 className="text-xs uppercase tracking-wider text-slate-400 font-bold mb-2">Selector de Mesas</h2>
+          <div className="grid grid-cols-5 gap-2">
+            {tables.map((table) => {
+              const isSelected = selectedTableId === table.id;
+              const isBusy = table.status === 'BUSY';
+              return (
+                <button
+                  key={table.id}
+                  onClick={() => {
+                    setSelectedTableId(table.id);
+                    setMessage(null);
+                  }}
+                  className={`py-3 rounded-xl font-black text-center text-sm transition-all border ${
+                    isSelected
+                      ? 'bg-blue-600 border-blue-400 text-white shadow-lg scale-105'
+                      : isBusy
+                      ? 'bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500/20'
+                      : 'bg-slate-800 border-slate-700/60 text-slate-400 hover:bg-slate-750'
+                  }`}
+                >
+                  M{table.number}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Panel de Cobro Detallado si la mesa está Ocupada */}
+        {selectedTable && selectedTable.status === 'BUSY' && (
+          <div className="bg-slate-950/80 border border-amber-500/25 rounded-xl p-4 flex flex-col gap-3 animate-fadeIn shadow-lg">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <div>
+                <span className="text-amber-400 font-extrabold text-sm block">Mesa Ocupada (Detalle Cuenta)</span>
+                <span className="text-slate-400 text-[10px]">Agrupa los consumos pendientes de cobro.</span>
+              </div>
+              <span className="px-2 py-0.5 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded text-[9px] font-black uppercase">
+                Pendiente
+              </span>
+            </div>
+
+            {isBillLoading ? (
+              <div className="text-center py-4 text-xs text-slate-500">Calculando cuenta...</div>
+            ) : billDetails ? (
+              <div className="space-y-3">
+                {/* Desglose de productos */}
+                <div className="max-h-32 overflow-y-auto space-y-1.5 pr-1 text-xs">
+                  {billDetails.items.map((item) => (
+                    <div key={item.id} className="flex justify-between text-slate-350">
+                      <span>{item.quantity}x {item.name}</span>
+                      <span className="font-semibold text-slate-200">{(item.price * item.quantity).toFixed(2)}€</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-between items-center pt-2 border-t border-slate-800/80">
+                  <span className="text-slate-400 font-bold text-xs uppercase">Total Cuenta:</span>
+                  <span className="text-lg font-black text-amber-400">{billDetails.total.toFixed(2)}€</span>
+                </div>
+
+                {/* Acciones de Cobro */}
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    onClick={() => checkoutTable('CASH')}
+                    disabled={isSending}
+                    className="py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-800 disabled:text-slate-600 text-slate-950 font-black rounded-lg text-xs transition-all uppercase tracking-wider flex items-center justify-center gap-1 shadow-md"
+                  >
+                    💵 Efectivo
+                  </button>
+                  <button
+                    onClick={() => checkoutTable('CARD')}
+                    disabled={isSending}
+                    className="py-2.5 bg-blue-500 hover:bg-blue-400 disabled:bg-slate-800 disabled:text-slate-600 text-white font-black rounded-lg text-xs transition-all uppercase tracking-wider flex items-center justify-center gap-1 shadow-md"
+                  >
+                    💳 Tarjeta
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-4 text-xs text-rose-450">No hay consumos.</div>
+            )}
+          </div>
+        )}
+
+        {/* Panel de Botones Grandes (Productos) */}
         <div>
           <h2 className="text-xs uppercase tracking-wider text-slate-400 font-bold mb-2">Productos</h2>
           <div className="grid grid-cols-2 gap-3">
@@ -166,6 +487,7 @@ export default function PDATerminal() {
           </div>
         </div>
 
+        {/* Resumen del Carrito */}
         <div className="flex-1 bg-slate-950/50 border border-slate-800 rounded-xl p-4 flex flex-col">
           <h2 className="text-xs uppercase tracking-wider text-slate-400 font-bold mb-3">Detalle Pedido</h2>
           
@@ -210,6 +532,7 @@ export default function PDATerminal() {
         </div>
       </main>
 
+      {/* Botón de Enviar */}
       <footer className="p-4 bg-slate-900 border-t border-slate-800">
         <button
           onClick={sendOrderToKitchen}

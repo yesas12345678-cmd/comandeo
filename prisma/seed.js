@@ -8,6 +8,7 @@ async function main() {
   await prisma.product.deleteMany({});
   await prisma.category.deleteMany({});
   await prisma.table.deleteMany({});
+  await prisma.waiter.deleteMany({});
   await prisma.tenant.deleteMany({});
 
   // ==========================================
@@ -56,6 +57,14 @@ async function main() {
     ],
   });
 
+  console.log('Creando Camareros para Bar Paco...');
+  await prisma.waiter.createMany({
+    data: [
+      { name: 'Carlos', pin: '1111', tenantId: tenantPaco.id },
+      { name: 'María', pin: '2222', tenantId: tenantPaco.id },
+    ],
+  });
+
   // ==========================================
   // 2. CREAR TENANT 2: TABERNA PEPE
   // ==========================================
@@ -64,7 +73,7 @@ async function main() {
     data: {
       name: 'Taberna Pepe',
       slug: 'barpepe',
-      apiKey: 'key_barpepe_test_456', // Su propia API Key
+      apiKey: 'key_barpepe_test_456',
     },
   });
 
@@ -99,7 +108,15 @@ async function main() {
     ],
   });
 
-  console.log('Base de datos inicializada con 2 Bares de prueba.');
+  console.log('Creando Camareros para Taberna Pepe...');
+  await prisma.waiter.createMany({
+    data: [
+      { name: 'Juan', pin: '3333', tenantId: tenantPepe.id },
+      { name: 'Laura', pin: '4444', tenantId: tenantPepe.id },
+    ],
+  });
+
+  console.log('Base de datos inicializada con 2 Bares y sus camareros correspondientes.');
 }
 
 main()

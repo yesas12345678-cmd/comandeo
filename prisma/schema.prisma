@@ -18,6 +18,7 @@ model Tenant {
   tables     Table[]
   orders     Order[]
   printJobs  PrintJob[]
+  waiters    Waiter[]
 }
 
 model Category {
@@ -56,24 +57,56 @@ model Table {
   @@unique([tenantId, number]) // El número de mesa es único dentro de cada bar
 }
 
+model Waiter {
+  id       String  @id @default(uuid())
+  name     String
+  pin      String  // Código PIN de acceso rápido (ej: "1234")
+  tenantId String
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orders   Order[]
+
+  @@unique([tenantId, pin]) // El PIN es único por restaurante
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+}
+
 model Order {
-  id        String   @id @default(uuid())
-  tableId   String
-  table     Table    @relation(fields: [tableId], references: [id])
-  items     Json
-  total     Float
-  createdAt DateTime @default(now())
-  tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id            String         @id @default(uuid())
+  tableId       String
+  table         Table          @relation(fields: [tableId], references: [id])
+  items         Json
+  total         Float
+  status        OrderStatus    @default(PENDING)
+  paymentMethod PaymentMethod?
+  createdAt     DateTime       @default(now())
+  tenantId      String
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  waiterId      String?
+  waiter        Waiter?        @relation(fields: [waiterId], references: [id], onDelete: SetNull)
+}
+
+enum PrintJobType {
+  KITCHEN  // Ticket para cocina (solo productos y cantidad)
+  RECEIPT  // Factura simplificada de caja (con precios, subtotal y total)
 }
 
 model PrintJob {
-  id        String   @id @default(uuid())
+  id        String       @id @default(uuid())
   tableNum  Int
   items     Json
   total     Float
-  printed   Boolean  @default(false)
-  createdAt DateTime @default(now())
+  printed   Boolean      @default(false)
+  type      PrintJobType @default(KITCHEN)
+  createdAt DateTime     @default(now())
   tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }

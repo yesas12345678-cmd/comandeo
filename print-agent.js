@@ -27,15 +27,15 @@ async function checkAndPrint() {
     const data = await res.json();
 
     if (data.success && data.jobs && data.jobs.length > 0) {
+      const tenantName = data.tenantName || 'TPV Cloud';
       for (const job of data.jobs) {
-        console.log(`\n[NUEVA COMANDA] Detectado pedido para Mesa ${job.tableNum}.`);
-        console.log(`Total: ${job.total.toFixed(2)}€ | Artículos: ${job.items.length}`);
+        console.log(`\n[TRABAJO DETECTADO] Tipo: ${job.type} | Mesa: ${job.tableNum} | Total: ${job.total.toFixed(2)}€`);
         
         try {
-          await printTicket(job);
+          await printTicket(job, tenantName);
         } catch (printError) {
           // Si falla físicamente, lo registramos pero continuamos con los siguientes trabajos
-          console.error(`[Error] Falló la impresión física del pedido ${job.id}`);
+          console.error(`[Error] Falló la impresión física del trabajo ${job.id}`);
         }
       }
     }
@@ -44,7 +44,7 @@ async function checkAndPrint() {
   }
 }
 
-function printTicket(job) {
+function printTicket(job, tenantName) {
   return new Promise((resolve, reject) => {
     const client = new net.Socket();
     client.setTimeout(5000); // 5 segundos max de espera de conexión
@@ -57,41 +57,81 @@ function printTicket(job) {
         // 1. Inicializar la impresora
         client.write(Buffer.from([ESC, 0x40]));
 
-        // 2. Cabecera comanda centrada y grande
-        client.write(Buffer.from([ESC, 0x61, 1])); // Centrado
-        client.write(Buffer.from([GS, 0x21, 0x11])); // Doble altura y doble anchura
-        client.write(Buffer.from([ESC, 0x45, 1])); // Negrita
-        client.write(Buffer.from(`MESA ${job.tableNum}\n\n`));
+        if (job.type === 'RECEIPT') {
+          // ==========================================
+          // TICKET DE CLIENTE (FACTURA SIMPLIFICADA)
+          // ==========================================
+          // Nombre del restaurante grande, centrado y negrita
+          client.write(Buffer.from([ESC, 0x61, 1])); // Centrado
+          client.write(Buffer.from([GS, 0x21, 0x11])); // Doble altura y doble anchura
+          client.write(Buffer.from([ESC, 0x45, 1])); // Negrita
+          client.write(Buffer.from(`${tenantName.toUpperCase()}\n`));
 
-        // 3. Restaurar formato estándar
-        client.write(Buffer.from([GS, 0x21, 0x00])); 
-        client.write(Buffer.from([ESC, 0x45, 0])); 
-        client.write(Buffer.from('--------------------------------\n'));
+          // Subtítulo normal
+          client.write(Buffer.from([GS, 0x21, 0x00])); 
+          client.write(Buffer.from([ESC, 0x45, 0])); 
+          client.write(Buffer.from("FACTURA SIMPLIFICADA\n"));
+          client.write(Buffer.from(`Mesa: #${job.tableNum}\n`));
+          client.write(Buffer.from(`Fecha: ${new Date(job.createdAt).toLocaleString('es-ES')}\n`));
+          client.write(Buffer.from('--------------------------------\n'));
 
-        // 4. Alinear a la izquierda para productos
-        client.write(Buffer.from([ESC, 0x61, 0])); 
+          // Detalle de productos alineado a la izquierda con precios
+          client.write(Buffer.from([ESC, 0x61, 0])); 
+          job.items.forEach((item) => {
+            const qtyText = `${item.quantity}x `;
+            const priceText = ` ${(item.price * item.quantity).toFixed(2)}€`;
+            const maxNameLen = 32 - qtyText.length - priceText.length;
+            const nameText = item.name.padEnd(maxNameLen).substring(0, maxNameLen);
 
-        job.items.forEach((item) => {
-          const qtyText = `${item.quantity}x `;
-          const priceText = ` ${(item.price * item.quantity).toFixed(2)}€`;
-          const maxNameLen = 32 - qtyText.length - priceText.length;
-          const nameText = item.name.padEnd(maxNameLen).substring(0, maxNameLen);
+            client.write(Buffer.from(`${qtyText}${nameText}${priceText}\n`, 'latin1'));
+          });
 
-          // Codificación latin1 para soporte de € y caracteres especiales en impresoras españolas
-          client.write(Buffer.from(`${qtyText}${nameText}${priceText}\n`, 'latin1'));
-        });
+          // Totalizador
+          client.write(Buffer.from('--------------------------------\n'));
+          client.write(Buffer.from([ESC, 0x61, 1])); // Centrado
+          client.write(Buffer.from([GS, 0x21, 0x11])); // Grande
+          client.write(Buffer.from([ESC, 0x45, 1])); // Negrita
+          client.write(Buffer.from(`TOTAL: ${job.total.toFixed(2)}€\n\n`));
 
-        // 5. Totalizador
-        client.write(Buffer.from('--------------------------------\n'));
-        client.write(Buffer.from([ESC, 0x61, 1])); // Centrado
-        client.write(Buffer.from([ESC, 0x45, 1])); // Negrita
-        client.write(Buffer.from(`TOTAL: ${job.total.toFixed(2)}€\n\n\n`));
+          // Pie de ticket
+          client.write(Buffer.from([GS, 0x21, 0x00])); 
+          client.write(Buffer.from([ESC, 0x45, 0])); 
+          client.write(Buffer.from("¡Gracias por su visita!\n\n\n"));
 
-        // 6. Comando de corte físico
+        } else {
+          // ==========================================
+          // COMANDA DE COCINA (SIN PRECIOS)
+          // ==========================================
+          // Título comanda grande y centrado
+          client.write(Buffer.from([ESC, 0x61, 1])); 
+          client.write(Buffer.from([GS, 0x21, 0x11])); 
+          client.write(Buffer.from([ESC, 0x45, 1])); 
+          client.write(Buffer.from("COMANDA COCINA\n"));
+          client.write(Buffer.from(`MESA #${job.tableNum}\n`));
+
+          // Info normal
+          client.write(Buffer.from([GS, 0x21, 0x00])); 
+          client.write(Buffer.from([ESC, 0x45, 0])); 
+          client.write(Buffer.from(`Hora: ${new Date(job.createdAt).toLocaleTimeString('es-ES')}\n`));
+          client.write(Buffer.from('--------------------------------\n'));
+
+          // Detalle de productos alineado a la izquierda (Solo cantidades, sin precios)
+          client.write(Buffer.from([ESC, 0x61, 0])); 
+          job.items.forEach((item) => {
+            const qtyText = `${item.quantity}x `;
+            const maxNameLen = 32 - qtyText.length;
+            const nameText = item.name.padEnd(maxNameLen).substring(0, maxNameLen);
+
+            client.write(Buffer.from(`${qtyText}${nameText}\n`, 'latin1'));
+          });
+          client.write(Buffer.from('--------------------------------\n\n\n'));
+        }
+
+        // Comando de corte físico de papel
         client.write(Buffer.from([GS, 0x56, 66, 0]));
 
         client.end();
-        console.log(`[OK] Mesa ${job.tableNum} impresa y papel cortado.`);
+        console.log(`[OK] Impreso tipo ${job.type} para Mesa ${job.tableNum} y papel cortado.`);
         resolve();
       } catch (err) {
         client.destroy();

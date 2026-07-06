@@ -7,12 +7,12 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
 export async function GET(request: Request) {
   try {
-    // 1. Obtener el subdominio del bar desde la cabecera del middleware
+    // 1. Obtener el subdominio del bar desde la cabecera
     const tenantSlug = request.headers.get('x-tenant-slug') || 'barpaco';
 
     // 2. Buscar el bar en la base de datos
     const tenant = await prisma.tenant.findUnique({
-      where: { slug: tenantSlug },
+      where: { slug: tenantSlug }
     });
 
     if (!tenant) {
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
       );
     }
 
-    // 3. Obtener únicamente los productos y mesas que pertenecen a este bar
+    // 3. Obtener únicamente los productos, mesas y camareros de este bar
     const products = await prisma.product.findMany({
       where: { tenantId: tenant.id },
       orderBy: { name: 'asc' },
@@ -31,12 +31,18 @@ export async function GET(request: Request) {
       where: { tenantId: tenant.id },
       orderBy: { number: 'asc' },
     });
+    const waiters = await prisma.waiter.findMany({
+      where: { tenantId: tenant.id },
+      select: { id: true, name: true }, // No devolvemos el PIN por seguridad
+      orderBy: { name: 'asc' },
+    });
 
     return NextResponse.json({
       success: true,
       tenantName: tenant.name,
       products,
-      tables
+      tables,
+      waiters
     }, { status: 200 });
   } catch (error: any) {
     console.error('Error inicializando datos:', error);
