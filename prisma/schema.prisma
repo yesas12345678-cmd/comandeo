@@ -8,17 +8,19 @@ generator client {
 }
 
 model Tenant {
-  id         String     @id @default(uuid())
-  name       String
-  slug       String     @unique // El subdominio para la URL (ej: "barpaco")
-  apiKey     String     @unique @default(uuid()) // Token secreto para el agente de impresión
-  createdAt  DateTime   @default(now())
-  categories Category[]
-  products   Product[]
-  tables     Table[]
-  orders     Order[]
-  printJobs  PrintJob[]
-  waiters    Waiter[]
+  id            String     @id @default(uuid())
+  name          String
+  slug          String     @unique // El subdominio para la URL (ej: "barpaco")
+  apiKey        String     @unique @default(uuid()) // Token secreto para el agente de impresión
+  adminUsername String     @default("admin")
+  adminPassword String     @default("admin123")
+  createdAt     DateTime   @default(now())
+  categories    Category[]
+  products      Product[]
+  tables        Table[]
+  orders        Order[]
+  printJobs     PrintJob[]
+  waiters       Waiter[]
 }
 
 model Category {

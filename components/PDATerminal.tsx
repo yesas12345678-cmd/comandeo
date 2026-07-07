@@ -6,6 +6,12 @@ interface Product {
   id: string;
   name: string;
   price: number;
+  categoryId: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
 }
 
 interface CartItem extends Product {
@@ -23,8 +29,10 @@ interface Waiter {
   name: string;
 }
 
-export default function PDATerminal() {
+export default function PDATerminal({ tenantSlug = 'barpaco' }: { tenantSlug?: string }) {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('ALL');
   const [tables, setTables] = useState<Table[]>([]);
   const [waiters, setWaiters] = useState<Waiter[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -47,10 +55,13 @@ export default function PDATerminal() {
   useEffect(() => {
     async function loadData() {
       try {
-        const response = await fetch('/api/init');
+        const response = await fetch('/api/init', {
+          headers: { 'x-tenant-slug': tenantSlug }
+        });
         const data = await response.json();
         if (data.success) {
           setProducts(data.products);
+          setCategories(data.categories || []);
           setTables(data.tables);
           setTenantName(data.tenantName);
           setWaiters(data.waiters);
@@ -70,7 +81,7 @@ export default function PDATerminal() {
       }
     }
     loadData();
-  }, []);
+  }, [tenantSlug]);
 
   // Cargar la cuenta de la mesa cuando cambia la selección o los estados de las mesas
   useEffect(() => {
@@ -88,7 +99,9 @@ export default function PDATerminal() {
   const fetchBillDetails = async (tableId: string) => {
     try {
       setIsBillLoading(true);
-      const res = await fetch(`/api/tables/${tableId}/bill`);
+      const res = await fetch(`/api/tables/${tableId}/bill`, {
+        headers: { 'x-tenant-slug': tenantSlug }
+      });
       const data = await res.json();
       if (res.ok && data.success) {
         setBillDetails({ items: data.items, total: data.total });
@@ -124,6 +137,10 @@ export default function PDATerminal() {
 
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
+  const filteredProducts = selectedCategoryId === 'ALL'
+    ? products
+    : products.filter((product) => product.categoryId === selectedCategoryId);
+
   // Obtener el objeto de la mesa seleccionada actualmente
   const selectedTable = tables.find((t) => t.id === selectedTableId);
 
@@ -156,7 +173,7 @@ export default function PDATerminal() {
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-tenant-slug': tenantSlug },
         body: JSON.stringify({ waiterId: selectedWaiterId, pin: pinCode }),
       });
       const data = await response.json();
@@ -186,6 +203,7 @@ export default function PDATerminal() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-tenant-slug': tenantSlug
         },
         body: JSON.stringify({
           tableId: selectedTableId,
@@ -229,6 +247,7 @@ export default function PDATerminal() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-tenant-slug': tenantSlug
         },
         body: JSON.stringify({ tableId: selectedTableId, paymentMethod: method }),
       });
@@ -385,32 +404,35 @@ export default function PDATerminal() {
           </div>
         )}
 
-        {/* Cuadrícula Visual de Mesas */}
+        {/* Selector de Mesas Desplegable */}
         <div>
-          <h2 className="text-xs uppercase tracking-wider text-slate-400 font-bold mb-2">Selector de Mesas</h2>
-          <div className="grid grid-cols-5 gap-2">
-            {tables.map((table) => {
-              const isSelected = selectedTableId === table.id;
-              const isBusy = table.status === 'BUSY';
-              return (
-                <button
-                  key={table.id}
-                  onClick={() => {
-                    setSelectedTableId(table.id);
-                    setMessage(null);
-                  }}
-                  className={`py-3 rounded-xl font-black text-center text-sm transition-all border ${
-                    isSelected
-                      ? 'bg-blue-600 border-blue-400 text-white shadow-lg scale-105'
-                      : isBusy
-                      ? 'bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500/20'
-                      : 'bg-slate-800 border-slate-700/60 text-slate-400 hover:bg-slate-750'
-                  }`}
-                >
-                  M{table.number}
-                </button>
-              );
-            })}
+          <label htmlFor="table-select" className="text-xs uppercase tracking-wider text-slate-400 font-bold block mb-2">
+            Selección de Mesa
+          </label>
+          <div className="relative">
+            <select
+              id="table-select"
+              value={selectedTableId}
+              onChange={(e) => {
+                setSelectedTableId(e.target.value);
+                setMessage(null);
+              }}
+              className="w-full appearance-none bg-slate-800 text-white rounded-xl border border-slate-700/60 px-4 py-3 font-extrabold outline-none focus:ring-2 focus:ring-blue-500 text-lg shadow-md cursor-pointer transition-all duration-150 pr-10"
+            >
+              {tables.map((table) => {
+                const isBusy = table.status === 'BUSY';
+                return (
+                  <option key={table.id} value={table.id} className="font-extrabold bg-slate-900 text-slate-100">
+                    Mesa {table.number} {isBusy ? '🔴 (Ocupada - Ver Cuenta)' : '🟢 (Libre)'}
+                  </option>
+                );
+              })}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-400">
+              <svg className="fill-current h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+              </svg>
+            </div>
           </div>
         </div>
 
@@ -470,22 +492,79 @@ export default function PDATerminal() {
           </div>
         )}
 
-        {/* Panel de Botones Grandes (Productos) */}
-        <div>
-          <h2 className="text-xs uppercase tracking-wider text-slate-400 font-bold mb-2">Productos</h2>
-          <div className="grid grid-cols-2 gap-3">
-            {products.map((product) => (
-              <button
-                key={product.id}
-                onClick={() => addToCart(product)}
-                className="flex flex-col items-center justify-between p-4 bg-slate-800 hover:bg-slate-700 active:scale-95 transition-all rounded-xl border border-slate-700 h-28 text-left"
-              >
-                <span className="text-lg font-bold w-full leading-tight">{product.name}</span>
-                <span className="text-blue-400 font-extrabold w-full text-right">{product.price.toFixed(2)}€</span>
-              </button>
-            ))}
+        {/* Vista por carpetas de categorías o listado de productos */}
+        {selectedCategoryId === 'ALL' ? (
+          /* Panel de Categorías (Carpetas) */
+          <div>
+            <h2 className="text-xs uppercase tracking-wider text-slate-400 font-bold mb-3">Categorías (Carpetas)</h2>
+            <div className="grid grid-cols-2 gap-4">
+              {categories.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => {
+                    setSelectedCategoryId(cat.id);
+                    setMessage(null);
+                  }}
+                  className="flex flex-col items-center justify-center p-6 bg-slate-800 hover:bg-slate-700 active:scale-95 transition-all duration-150 rounded-2xl border border-slate-700 h-32 gap-3 shadow group hover:border-blue-500/50"
+                >
+                  <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-all duration-200 shadow-inner">
+                    {/* Icono de Carpeta */}
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                    </svg>
+                  </div>
+                  <span className="text-sm font-extrabold text-slate-100 group-hover:text-white transition-colors text-center w-full leading-tight truncate px-1">
+                    {cat.name}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : (
+          /* Panel de Productos en la Categoría Seleccionada */
+          <div>
+            <div className="flex items-center gap-3 mb-4">
+              <button
+                onClick={() => {
+                  setSelectedCategoryId('ALL');
+                  setMessage(null);
+                }}
+                className="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-90 text-white flex items-center justify-center border border-slate-700/80 transition-all cursor-pointer shadow-md"
+                title="Volver a las carpetas"
+              >
+                {/* Icono de flecha volver */}
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7"></path>
+                </svg>
+              </button>
+              <div>
+                <span className="text-[10px] text-blue-450 font-extrabold uppercase tracking-widest block">Categoría</span>
+                <h2 className="text-lg font-black text-white leading-tight">
+                  {categories.find(c => c.id === selectedCategoryId)?.name || 'Productos'}
+                </h2>
+              </div>
+            </div>
+
+            {filteredProducts.length === 0 ? (
+              <div className="text-center py-10 bg-slate-950/20 border border-slate-800/40 rounded-2xl text-xs text-slate-500 font-semibold">
+                No hay productos en esta categoría.
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                {filteredProducts.map((product) => (
+                  <button
+                    key={product.id}
+                    onClick={() => addToCart(product)}
+                    className="flex flex-col items-center justify-between p-4 bg-slate-800 hover:bg-slate-700 active:scale-95 transition-all duration-150 rounded-xl border border-slate-700 h-28 text-left group shadow-sm hover:shadow-md"
+                  >
+                    <span className="text-sm font-bold w-full leading-tight text-slate-100 group-hover:text-white transition-colors">{product.name}</span>
+                    <span className="text-blue-400 font-extrabold w-full text-right text-sm">{product.price.toFixed(2)}€</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Resumen del Carrito */}
         <div className="flex-1 bg-slate-950/50 border border-slate-800 rounded-xl p-4 flex flex-col">

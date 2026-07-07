@@ -31,6 +31,13 @@ async function checkAndPrint() {
       for (const job of data.jobs) {
         console.log(`\n[TRABAJO DETECTADO] Tipo: ${job.type} | Mesa: ${job.tableNum} | Total: ${job.total.toFixed(2)}€`);
         
+        // MOSTRAR DETALLE DE PRODUCTOS EN LA CONSOLA LOCAL
+        console.log('Detalle de Consumos:');
+        job.items.forEach((item) => {
+          console.log(`   * ${item.quantity}x ${item.name} (${item.price.toFixed(2)}€/ud)`);
+        });
+        console.log('---------------------------------------------');
+        
         try {
           await printTicket(job, tenantName);
         } catch (printError) {

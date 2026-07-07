@@ -22,8 +22,12 @@ export async function GET(request: Request) {
       );
     }
 
-    // 3. Obtener únicamente los productos, mesas y camareros de este bar
+    // 3. Obtener únicamente los productos, categorías, mesas y camareros de este bar
     const products = await prisma.product.findMany({
+      where: { tenantId: tenant.id },
+      orderBy: { name: 'asc' },
+    });
+    const categories = await prisma.category.findMany({
       where: { tenantId: tenant.id },
       orderBy: { name: 'asc' },
     });
@@ -41,6 +45,7 @@ export async function GET(request: Request) {
       success: true,
       tenantName: tenant.name,
       products,
+      categories,
       tables,
       waiters
     }, { status: 200 });
