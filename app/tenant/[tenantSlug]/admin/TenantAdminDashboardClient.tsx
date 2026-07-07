@@ -330,6 +330,19 @@ export default function TenantAdminDashboardClient({ tenantSlug, bypassAuth = fa
   const totalSales = orders.reduce((sum, order) => sum + order.total, 0);
   const averageTicket = orders.length > 0 ? totalSales / orders.length : 0;
 
+  // Calcular ranking de productos más vendidos
+  const getProductRanking = () => {
+    const counts: { [name: string]: number } = {};
+    orders.forEach(order => {
+      order.items.forEach(item => {
+        counts[item.name] = (counts[item.name] || 0) + item.quantity;
+      });
+    });
+    return Object.entries(counts)
+      .map(([name, quantity]) => ({ name, quantity }))
+      .sort((a, b) => b.quantity - a.quantity);
+  };
+
   if (isAuthorized === null) {
     return (
       <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100 items-center justify-center font-sans">
@@ -343,9 +356,12 @@ export default function TenantAdminDashboardClient({ tenantSlug, bypassAuth = fa
     return (
       <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100 font-sans items-center justify-center p-6">
         <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-black text-white tracking-tight mb-2">Panel del Bar</h1>
-            <p className="text-blue-400 font-bold uppercase text-xs tracking-wider">Acceso Propietario ({tenantSlug})</p>
+          <div className="text-center mb-8 flex flex-col items-center gap-3">
+            <img src="/logo.png" alt="Comandeo Logo" className="w-16 h-16 rounded-2xl object-cover border border-slate-800 shadow-md" />
+            <div>
+              <h1 className="text-3xl font-black text-white tracking-tight mb-1">Panel del Bar</h1>
+              <p className="text-blue-400 font-bold uppercase text-xs tracking-wider">Acceso Propietario ({tenantSlug})</p>
+            </div>
           </div>
 
           {loginError && (
@@ -405,9 +421,12 @@ export default function TenantAdminDashboardClient({ tenantSlug, bypassAuth = fa
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
       {/* Cabecera */}
       <header className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center justify-between shadow-lg">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-white">{tenantName}</h1>
-          <p className="text-xs text-blue-400 font-semibold uppercase tracking-wider">Panel de Administración</p>
+        <div className="flex items-center gap-3">
+          <img src="/logo.png" alt="Comandeo Logo" className="w-10 h-10 rounded-xl object-cover border border-slate-800 shadow-sm" />
+          <div>
+            <h1 className="text-2xl font-black tracking-tight text-white">{tenantName}</h1>
+            <p className="text-xs text-blue-400 font-semibold uppercase tracking-wider">Panel de Administración</p>
+          </div>
         </div>
         <div className="flex gap-3">
           <button
@@ -466,38 +485,65 @@ export default function TenantAdminDashboardClient({ tenantSlug, bypassAuth = fa
               </div>
             </div>
 
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md">
-              <h2 className="text-lg font-black text-white mb-4">Comandas Recientes</h2>
-              {orders.length === 0 ? (
-                <p className="text-slate-500 text-sm text-center py-6">No se han registrado comandas hoy.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-800 text-slate-400 font-bold">
-                        <th className="pb-3">Mesa</th>
-                        <th className="pb-3">Fecha y Hora</th>
-                        <th className="pb-3">Detalle del Pedido</th>
-                        <th className="pb-3 text-right">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/50">
-                      {orders.map((order) => (
-                        <tr key={order.id} className="hover:bg-slate-850/40">
-                          <td className="py-4 font-black text-blue-400">#{order.tableId.replace(/\D/g, '') || order.tableId}</td>
-                          <td className="py-4 text-slate-400">
-                            {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(order.createdAt).toLocaleDateString()}
-                          </td>
-                          <td className="py-4 max-w-xs truncate">
-                            {order.items.map((item) => `${item.quantity}x ${item.name}`).join(', ')}
-                          </td>
-                          <td className="py-4 text-right font-bold text-white">{order.total.toFixed(2)}€</td>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Comandas Recientes */}
+              <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md">
+                <h2 className="text-lg font-black text-white mb-4">Comandas Recientes</h2>
+                {orders.length === 0 ? (
+                  <p className="text-slate-500 text-sm text-center py-6">No se han registrado comandas hoy.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-800 text-slate-400 font-bold">
+                          <th className="pb-3">Mesa</th>
+                          <th className="pb-3">Fecha y Hora</th>
+                          <th className="pb-3">Detalle del Pedido</th>
+                          <th className="pb-3 text-right">Total</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/50">
+                        {orders.map((order) => (
+                          <tr key={order.id} className="hover:bg-slate-850/40">
+                            <td className="py-4 font-black text-blue-400">#{order.tableId.replace(/\D/g, '') || order.tableId}</td>
+                            <td className="py-4 text-slate-400">
+                              {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(order.createdAt).toLocaleDateString()}
+                            </td>
+                            <td className="py-4 max-w-xs truncate">
+                              {order.items.map((item) => `${item.quantity}x ${item.name}`).join(', ')}
+                            </td>
+                            <td className="py-4 text-right font-bold text-white">{order.total.toFixed(2)}€</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Ranking de Productos */}
+              <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md">
+                <h2 className="text-lg font-black text-white mb-4">Ranking de Productos</h2>
+                {getProductRanking().length === 0 ? (
+                  <p className="text-slate-500 text-sm text-center py-6">No hay datos de consumo aún.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {getProductRanking().map((prod, index) => (
+                      <div key={prod.name} className="flex items-center justify-between p-3 bg-slate-950/40 border border-slate-850/60 rounded-xl">
+                        <div className="flex items-center gap-3">
+                          <span className="w-6 h-6 flex items-center justify-center bg-blue-500/10 text-blue-400 rounded-full text-xs font-black">
+                            {index + 1}
+                          </span>
+                          <span className="font-extrabold text-sm text-slate-200">{prod.name}</span>
+                        </div>
+                        <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 rounded-lg text-xs font-black">
+                          {prod.quantity} {prod.quantity === 1 ? 'ud' : 'uds'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}

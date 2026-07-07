@@ -77,9 +77,12 @@ export default function GlobalAdminPage() {
     return (
       <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100 font-sans items-center justify-center p-6">
         <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-black text-white tracking-tight mb-2">Comandeo</h1>
-            <p className="text-indigo-400 font-bold uppercase text-xs tracking-wider">Super Administración Global</p>
+          <div className="text-center mb-8 flex flex-col items-center gap-3">
+            <img src="/logo.png" alt="Comandeo Logo" className="w-16 h-16 rounded-2xl object-cover border border-slate-800 shadow-md" />
+            <div>
+              <h1 className="text-3xl font-black text-white tracking-tight mb-1">Comandeo</h1>
+              <p className="text-indigo-400 font-bold uppercase text-xs tracking-wider">Super Administración Global</p>
+            </div>
           </div>
 
           {loginError && (
@@ -117,7 +120,7 @@ export default function GlobalAdminPage() {
               type="submit"
               className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-slate-950 font-black rounded-xl text-sm transition-all shadow-lg shadow-indigo-500/10 active:scale-98 uppercase tracking-wider"
             >
-              Acceder al Core
+              Acceder al Panel General
             </button>
           </form>
         </div>
@@ -130,8 +133,8 @@ export default function GlobalAdminPage() {
       {/* Super Admin Control Bar */}
       <div className="bg-indigo-950 border-b border-indigo-900 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
         <div className="flex items-center gap-3">
-          <span className="text-lg font-black bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent uppercase tracking-wider">Super Admin Core</span>
-          <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-[10px] font-black rounded uppercase tracking-wider">Modo Dios</span>
+          <img src="/logo.png" alt="Comandeo Logo" className="w-8 h-8 rounded-lg object-cover border border-indigo-850" />
+          <span className="text-lg font-black bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent uppercase tracking-wider">Super Administrador</span>
         </div>
 
         {/* Tenant Selector Dropdown */}
@@ -158,7 +161,7 @@ export default function GlobalAdminPage() {
           onClick={handleLogout}
           className="px-4 py-2 bg-indigo-900/60 hover:bg-indigo-800 text-indigo-200 hover:text-white font-bold rounded-lg text-xs transition-all uppercase tracking-wider"
         >
-          Cerrar Sesión Core
+          Cerrar Sesión
         </button>
       </div>
 
