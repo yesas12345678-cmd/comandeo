@@ -761,7 +761,7 @@ export default function PDATerminal({ tenantSlug = 'barpaco' }: { tenantSlug?: s
               {tables.length === 0 ? (
                 <p className="text-slate-500 text-xs text-center py-6">No hay mesas registradas.</p>
               ) : (
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-4 gap-2">
                   {tables.map((table) => {
                     const isBusy = table.status === 'BUSY';
                     return (
@@ -772,16 +772,13 @@ export default function PDATerminal({ tenantSlug = 'barpaco' }: { tenantSlug?: s
                           setIsTableModalOpen(false);
                           setMessage(null);
                         }}
-                        className={`aspect-square flex flex-col items-center justify-center rounded-xl border text-center transition-all cursor-pointer select-none active:scale-95 shadow-md ${
+                        className={`py-3.5 px-1 flex flex-col items-center justify-center rounded-xl border text-center transition-all cursor-pointer select-none active:scale-95 shadow-md ${
                           isBusy
-                            ? 'bg-rose-500/10 hover:bg-rose-500/15 border-rose-500/25 text-rose-450 hover:border-rose-500/40'
-                            : 'bg-emerald-500/10 hover:bg-emerald-500/15 border-emerald-500/25 text-emerald-400 hover:border-emerald-500/40'
+                            ? 'bg-rose-500/10 hover:bg-rose-500/15 border-rose-500/25 text-rose-455 hover:border-rose-500/40'
+                            : 'bg-emerald-500/10 hover:bg-emerald-500/15 border-emerald-500/25 text-emerald-450 hover:border-emerald-500/40'
                         }`}
                       >
-                        <span className="text-2xl font-black">{table.number}</span>
-                        <span className="text-[8px] font-extrabold uppercase mt-1 tracking-wider opacity-80">
-                          {isBusy ? 'Ocupada' : 'Libre'}
-                        </span>
+                        <span className="text-xl font-black">{table.number}</span>
                       </button>
                     );
                   })}
