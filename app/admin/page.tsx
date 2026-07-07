@@ -126,7 +126,7 @@ export default function GlobalAdminPage() {
       <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100 font-sans items-center justify-center p-6">
         <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
           <div className="text-center mb-8 flex flex-col items-center gap-3">
-            <img src="/logo.png" alt="Comandeo Logo" className="w-16 h-16 rounded-2xl object-cover border border-slate-800 shadow-md" />
+            <img src="/logo.svg" alt="Comandeo Logo" className="w-16 h-16 object-contain" />
             <div>
               <h1 className="text-3xl font-black text-white tracking-tight mb-1">Comandeo</h1>
               <p className="text-indigo-400 font-bold uppercase text-xs tracking-wider">Super Administración Global</p>
@@ -181,7 +181,7 @@ export default function GlobalAdminPage() {
       {/* Super Admin Control Bar */}
       <div className="bg-indigo-950 border-b border-indigo-900 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
         <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="Comandeo Logo" className="w-8 h-8 rounded-lg object-cover border border-indigo-850" />
+          <img src="/logo.svg" alt="Comandeo Logo" className="w-8 h-8 object-contain" />
           <span className="text-lg font-black bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent uppercase tracking-wider">Super Administrador</span>
         </div>
 

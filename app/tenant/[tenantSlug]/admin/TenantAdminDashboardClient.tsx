@@ -425,7 +425,7 @@ export default function TenantAdminDashboardClient({ tenantSlug, bypassAuth = fa
       <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100 font-sans items-center justify-center p-6">
         <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
           <div className="text-center mb-8 flex flex-col items-center gap-3">
-            <img src="/logo.png" alt="Comandeo Logo" className="w-16 h-16 rounded-2xl object-cover border border-slate-800 shadow-md" />
+            <img src="/logo.svg" alt="Comandeo Logo" className="w-16 h-16 object-contain" />
             <div>
               <h1 className="text-3xl font-black text-white tracking-tight mb-1">Panel del Bar</h1>
               <p className="text-blue-400 font-bold uppercase text-xs tracking-wider">Acceso Propietario ({tenantSlug})</p>
@@ -490,7 +490,7 @@ export default function TenantAdminDashboardClient({ tenantSlug, bypassAuth = fa
       {/* Cabecera */}
       <header className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center justify-between shadow-lg">
         <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="Comandeo Logo" className="w-10 h-10 rounded-xl object-cover border border-slate-800 shadow-sm" />
+          <img src="/logo.svg" alt="Comandeo Logo" className="w-10 h-10 object-contain" />
           <div>
             <h1 className="text-2xl font-black tracking-tight text-white">{tenantName}</h1>
             <p className="text-xs text-blue-400 font-semibold uppercase tracking-wider">Panel de Administración</p>
