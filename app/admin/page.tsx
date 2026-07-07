@@ -11,6 +11,7 @@ interface Tenant {
 
 export default function GlobalAdminPage() {
   const [isSuperAuthorized, setIsSuperAuthorized] = useState<boolean | null>(null);
+  const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
 
@@ -50,12 +51,12 @@ export default function GlobalAdminPage() {
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwordInput === 'Manuel1214$') {
+    if (usernameInput === 'zVaito' && passwordInput === 'Manuel1214$') {
       sessionStorage.setItem('global_admin_auth', 'true');
       setIsSuperAuthorized(true);
       setLoginError('');
     } else {
-      setLoginError('Contraseña de Super Admin incorrecta.');
+      setLoginError('Usuario o contraseña incorrectos.');
     }
   };
 
@@ -89,7 +90,19 @@ export default function GlobalAdminPage() {
 
           <form onSubmit={handlePasswordSubmit} className="space-y-5">
             <div>
-              <label htmlFor="super-password" className="text-slate-400 text-xs font-bold block mb-1">Contraseña Maestra</label>
+              <label htmlFor="super-username" className="text-slate-400 text-xs font-bold block mb-1">Usuario</label>
+              <input
+                id="super-username"
+                type="text"
+                value={usernameInput}
+                onChange={(e) => setUsernameInput(e.target.value)}
+                placeholder="Usuario Admin"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="super-password" className="text-slate-400 text-xs font-bold block mb-1">Contraseña</label>
               <input
                 id="super-password"
                 type="password"

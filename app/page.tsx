@@ -9,18 +9,11 @@ export const metadata: Metadata = {
 export default function LandingPage() {
   return (
     <div className="bg-slate-950 text-slate-100 min-h-screen font-sans overflow-x-hidden selection:bg-blue-600 selection:text-white">
-      {/* Header / Navbar */}
       <header className="max-w-6xl mx-auto px-6 py-6 flex justify-between items-center border-b border-slate-900">
         <div className="flex items-center gap-2">
           <span className="text-2xl font-black bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent tracking-tight">Comandeo</span>
           <span className="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-[10px] font-black rounded uppercase tracking-wider">Cloud</span>
         </div>
-        <a 
-          href="/admin" 
-          className="text-sm font-bold text-slate-400 hover:text-white transition-colors"
-        >
-          Acceso Administrador
-        </a>
       </header>
 
       {/* Hero Section */}
