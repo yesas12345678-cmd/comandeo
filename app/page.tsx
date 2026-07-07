@@ -32,7 +32,9 @@ export default function LandingPage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 mt-4 justify-center md:justify-start">
             <a 
-              href="mailto:ventas@comandeo.com?subject=Contratar%20Comandeo"
+              href="https://wa.me/34641403129?text=Hola,%20estoy%20interesado%20en%20Comandeo%20Cloud%20y%20me%20gustar%C3%ADa%20solicitar%20una%20prueba%20gratis"
+              target="_blank"
+              rel="noopener noreferrer"
               className="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-slate-950 font-black rounded-xl text-lg transition-all text-center shadow-lg shadow-blue-500/20 active:scale-98"
             >
               Comenzar prueba gratis

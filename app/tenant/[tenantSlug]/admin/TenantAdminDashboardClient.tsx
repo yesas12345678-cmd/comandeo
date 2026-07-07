@@ -429,6 +429,14 @@ export default function TenantAdminDashboardClient({ tenantSlug, bypassAuth = fa
           </div>
         </div>
         <div className="flex gap-3">
+          <a
+            href={`https://wa.me/34641403129?text=Hola,%20necesito%20ayuda%20con%20la%20administraci%C3%B3n%20de%20mi%20bar%20(${encodeURIComponent(tenantName)})%20en%20Comandeo.`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 font-bold rounded-lg text-sm transition-all flex items-center gap-2 border border-blue-500/20"
+          >
+            💬 Soporte
+          </a>
           <button
             onClick={handleLogout}
             className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-350 font-bold rounded-lg text-sm transition-all"
