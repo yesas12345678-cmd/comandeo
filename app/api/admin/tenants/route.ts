@@ -14,6 +14,12 @@ export async function GET(request: Request) {
         name: true,
         adminUsername: true,
         adminPassword: true,
+        hasTwoPrinters: true,
+        drinksCategoryId: true,
+        barPrinterIp: true,
+        barPrinterPort: true,
+        kitchenPrinterIp: true,
+        kitchenPrinterPort: true,
       },
       orderBy: { name: 'asc' }
     });
@@ -28,23 +34,39 @@ export async function GET(request: Request) {
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
-    const { id, adminUsername, adminPassword } = body;
+    const {
+      id,
+      adminUsername,
+      adminPassword,
+      hasTwoPrinters,
+      drinksCategoryId,
+      barPrinterIp,
+      barPrinterPort,
+      kitchenPrinterIp,
+      kitchenPrinterPort
+    } = body;
 
-    if (!id || !adminUsername || !adminPassword) {
+    if (!id) {
       return NextResponse.json({ success: false, error: 'Faltan campos obligatorios.' }, { status: 400 });
     }
 
     const updatedTenant = await prisma.tenant.update({
       where: { id },
       data: {
-        adminUsername,
-        adminPassword,
+        adminUsername: adminUsername !== undefined ? adminUsername : undefined,
+        adminPassword: adminPassword !== undefined ? adminPassword : undefined,
+        hasTwoPrinters: hasTwoPrinters !== undefined ? hasTwoPrinters : undefined,
+        drinksCategoryId: drinksCategoryId !== undefined ? drinksCategoryId : undefined,
+        barPrinterIp: barPrinterIp !== undefined ? barPrinterIp : undefined,
+        barPrinterPort: barPrinterPort !== undefined ? parseInt(barPrinterPort) || undefined : undefined,
+        kitchenPrinterIp: kitchenPrinterIp !== undefined ? kitchenPrinterIp : undefined,
+        kitchenPrinterPort: kitchenPrinterPort !== undefined ? parseInt(kitchenPrinterPort) || undefined : undefined,
       }
     });
 
     return NextResponse.json({ success: true, tenant: updatedTenant }, { status: 200 });
   } catch (error: any) {
-    console.error('Error updating tenant credentials:', error);
+    console.error('Error updating tenant credentials/settings:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

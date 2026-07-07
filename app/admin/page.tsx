@@ -9,6 +9,12 @@ interface Tenant {
   name: string;
   adminUsername?: string;
   adminPassword?: string;
+  hasTwoPrinters?: boolean;
+  drinksCategoryId?: string;
+  barPrinterIp?: string;
+  barPrinterPort?: number;
+  kitchenPrinterIp?: string;
+  kitchenPrinterPort?: number;
 }
 
 export default function GlobalAdminPage() {
@@ -21,9 +27,15 @@ export default function GlobalAdminPage() {
   const [selectedTenantSlug, setSelectedTenantSlug] = useState('');
   const [isLoadingTenants, setIsLoadingTenants] = useState(false);
 
-  // States for selected tenant credentials editing
+  // States for selected tenant settings/credentials editing
   const [adminUsername, setAdminUsername] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
+  const [hasTwoPrinters, setHasTwoPrinters] = useState(false);
+  const [barPrinterIp, setBarPrinterIp] = useState('192.168.1.100');
+  const [barPrinterPort, setBarPrinterPort] = useState('9100');
+  const [kitchenPrinterIp, setKitchenPrinterIp] = useState('192.168.1.101');
+  const [kitchenPrinterPort, setKitchenPrinterPort] = useState('9100');
+
   const [isUpdatingCredentials, setIsUpdatingCredentials] = useState(false);
   const [credMessage, setCredMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -64,6 +76,11 @@ export default function GlobalAdminPage() {
     if (currentTenant) {
       setAdminUsername(currentTenant.adminUsername || '');
       setAdminPassword(currentTenant.adminPassword || '');
+      setHasTwoPrinters(currentTenant.hasTwoPrinters || false);
+      setBarPrinterIp(currentTenant.barPrinterIp || '192.168.1.100');
+      setBarPrinterPort(currentTenant.barPrinterPort?.toString() || '9100');
+      setKitchenPrinterIp(currentTenant.kitchenPrinterIp || '192.168.1.101');
+      setKitchenPrinterPort(currentTenant.kitchenPrinterPort?.toString() || '9100');
       setCredMessage(null);
     }
   }, [selectedTenantSlug, tenants]);
@@ -91,15 +108,35 @@ export default function GlobalAdminPage() {
         body: JSON.stringify({
           id: currentTenant.id,
           adminUsername,
-          adminPassword
+          adminPassword,
+          hasTwoPrinters,
+          barPrinterIp,
+          barPrinterPort: parseInt(barPrinterPort) || 9100,
+          kitchenPrinterIp,
+          kitchenPrinterPort: parseInt(kitchenPrinterPort) || 9100,
         })
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setCredMessage({ type: 'success', text: 'Credenciales del bar actualizadas con éxito.' });
-        setTenants(prev => prev.map(t => t.id === currentTenant.id ? { ...t, adminUsername, adminPassword } : t));
+        setCredMessage({ type: 'success', text: 'Configuración y credenciales del bar guardadas con éxito.' });
+        setTenants(prev =>
+          prev.map(t =>
+            t.id === currentTenant.id
+              ? {
+                  ...t,
+                  adminUsername,
+                  adminPassword,
+                  hasTwoPrinters,
+                  barPrinterIp,
+                  barPrinterPort: parseInt(barPrinterPort) || 9100,
+                  kitchenPrinterIp,
+                  kitchenPrinterPort: parseInt(kitchenPrinterPort) || 9100,
+                }
+              : t
+          )
+        );
       } else {
-        setCredMessage({ type: 'error', text: data.error || 'Error al actualizar credenciales.' });
+        setCredMessage({ type: 'error', text: data.error || 'Error al guardar la configuración.' });
       }
     } catch (err) {
       setCredMessage({ type: 'error', text: 'Error de red.' });
@@ -215,47 +252,134 @@ export default function GlobalAdminPage() {
 
       {/* Credenciales del Bar Seleccionado */}
       {currentTenant && (
-        <div className="bg-slate-900 border-b border-slate-800 p-6 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex-1">
-            <h3 className="text-sm font-black text-white uppercase tracking-wider">Acceso Administrador de: <span className="text-blue-400">{currentTenant.name}</span></h3>
-            <p className="text-slate-400 text-xs mt-1">Configura el usuario y contraseña privados con los que el dueño accede a su panel de bar (/admin).</p>
+        <div className="bg-slate-900 border-b border-slate-800 p-6 flex flex-col gap-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-800/80 pb-4 gap-4">
+            <div>
+              <h3 className="text-sm font-black text-white uppercase tracking-wider">Ajustes Generales de: <span className="text-indigo-400">{currentTenant.name}</span></h3>
+              <p className="text-slate-400 text-xs mt-1">Configura credenciales de acceso e impresoras térmicas ESC/POS.</p>
+            </div>
+            {credMessage && (
+              <div className={`px-4 py-2 rounded-lg text-xs font-bold text-center ${
+                credMessage.type === 'success' ? 'bg-emerald-500/15 text-emerald-450' : 'bg-rose-500/15 text-rose-450'
+              }`}>
+                {credMessage.text}
+              </div>
+            )}
           </div>
-          <form onSubmit={handleUpdateCredentials} className="flex flex-col sm:flex-row items-end gap-3 w-full md:w-auto">
-            <div className="w-full sm:w-auto">
-              <label className="text-slate-400 text-[10px] font-bold block mb-1 uppercase tracking-wider">Usuario Admin</label>
-              <input
-                type="text"
-                value={adminUsername}
-                onChange={(e) => setAdminUsername(e.target.value)}
-                className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none w-full sm:w-40 font-bold"
-                required
-              />
+
+          <form onSubmit={handleUpdateCredentials} className="space-y-6">
+            {/* Fila 1: Credenciales */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="w-full">
+                <label className="text-slate-400 text-[10px] font-bold block mb-1 uppercase tracking-wider">Usuario Admin Bar</label>
+                <input
+                  type="text"
+                  value={adminUsername}
+                  onChange={(e) => setAdminUsername(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none w-full font-bold"
+                  required
+                />
+              </div>
+              <div className="w-full">
+                <label className="text-slate-400 text-[10px] font-bold block mb-1 uppercase tracking-wider">Contraseña Admin Bar</label>
+                <input
+                  type="text"
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none w-full font-bold"
+                  required
+                />
+              </div>
+              <div className="w-full">
+                <label className="text-slate-400 text-[10px] font-bold block mb-1 uppercase tracking-wider">Modo Impresoras</label>
+                <select
+                  value={hasTwoPrinters ? 'true' : 'false'}
+                  onChange={(e) => setHasTwoPrinters(e.target.value === 'true')}
+                  className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none w-full font-bold cursor-pointer"
+                >
+                  <option value="false">1 Impresora (Solo Barra)</option>
+                  <option value="true">2 Impresoras (Barra y Cocina)</option>
+                </select>
+              </div>
             </div>
-            <div className="w-full sm:w-auto">
-              <label className="text-slate-400 text-[10px] font-bold block mb-1 uppercase tracking-wider">Contraseña Admin</label>
-              <input
-                type="text"
-                value={adminPassword}
-                onChange={(e) => setAdminPassword(e.target.value)}
-                className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none w-full sm:w-40 font-bold"
-                required
-              />
+
+            {/* Fila 2: Red Impresoras */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-800/40">
+              <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl space-y-3">
+                <span className="text-blue-400 text-xs font-black uppercase tracking-wider block">🖨️ Impresora Barra (Principal y Tickets)</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-slate-450 text-[9px] font-bold block mb-1 uppercase">Dirección IP</label>
+                    <input
+                      type="text"
+                      value={barPrinterIp}
+                      onChange={(e) => setBarPrinterIp(e.target.value)}
+                      className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white focus:ring-1 focus:ring-indigo-500 outline-none w-full font-bold"
+                      placeholder="192.168.1.100"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-450 text-[9px] font-bold block mb-1 uppercase">Puerto Raw</label>
+                    <input
+                      type="text"
+                      value={barPrinterPort}
+                      onChange={(e) => setBarPrinterPort(e.target.value)}
+                      className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white focus:ring-1 focus:ring-indigo-500 outline-none w-full font-bold"
+                      placeholder="9100"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className={`p-4 border rounded-xl space-y-3 transition-opacity ${
+                hasTwoPrinters
+                  ? 'bg-slate-950/40 border-slate-850 opacity-100'
+                  : 'bg-slate-950/10 border-slate-900/60 opacity-40 pointer-events-none'
+              }`}>
+                <span className="text-indigo-400 text-xs font-black uppercase tracking-wider block">🍳 Impresora Cocina (Solo Comida)</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-slate-450 text-[9px] font-bold block mb-1 uppercase">Dirección IP</label>
+                    <input
+                      type="text"
+                      value={kitchenPrinterIp}
+                      onChange={(e) => setKitchenPrinterIp(e.target.value)}
+                      className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white focus:ring-1 focus:ring-indigo-500 outline-none w-full font-bold"
+                      placeholder="192.168.1.101"
+                      required={hasTwoPrinters}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-450 text-[9px] font-bold block mb-1 uppercase">Puerto Raw</label>
+                    <input
+                      type="text"
+                      value={kitchenPrinterPort}
+                      onChange={(e) => setKitchenPrinterPort(e.target.value)}
+                      className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white focus:ring-1 focus:ring-indigo-500 outline-none w-full font-bold"
+                      placeholder="9100"
+                      required={hasTwoPrinters}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-            <button
-              type="submit"
-              disabled={isUpdatingCredentials}
-              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-850 disabled:text-slate-500 text-slate-950 font-black rounded-lg text-xs uppercase tracking-wider transition-all w-full sm:w-auto cursor-pointer"
-            >
-              {isUpdatingCredentials ? 'Guardando...' : 'Actualizar'}
-            </button>
+
+            {/* Fila 3: Acciones y Guía */}
+            <div className="flex flex-col sm:flex-row items-center justify-between pt-4 border-t border-slate-850 gap-4">
+              <div className="text-[11px] text-slate-400 text-left">
+                💡 <strong>Guía rápida de conexión:</strong> Conecta la impresora al mismo router local mediante cable de red RJ45. Asigna una IP fija estática en el rango de tu red (ej. 192.168.1.100) utilizando el software de configuración del fabricante y conéctalo al puerto RAW (generalmente 9100).
+              </div>
+              <button
+                type="submit"
+                disabled={isUpdatingCredentials}
+                className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-850 disabled:text-slate-500 text-slate-950 font-black rounded-lg text-xs uppercase tracking-wider transition-all w-full sm:w-auto cursor-pointer flex-shrink-0"
+              >
+                {isUpdatingCredentials ? 'Guardando...' : '💾 Guardar Configuración'}
+              </button>
+            </div>
           </form>
-          {credMessage && (
-            <div className={`px-4 py-2 rounded-lg text-xs font-bold w-full md:w-auto text-center ${
-              credMessage.type === 'success' ? 'bg-emerald-500/15 text-emerald-450' : 'bg-rose-500/15 text-rose-450'
-            }`}>
-              {credMessage.text}
-            </div>
-          )}
         </div>
       )}
 

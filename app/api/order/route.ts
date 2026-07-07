@@ -10,6 +10,8 @@ interface OrderItem {
   name: string;
   price: number;
   quantity: number;
+  categoryId: string;
+  note?: string;
 }
 
 export async function POST(request: Request) {
@@ -50,15 +52,25 @@ export async function POST(request: Request) {
       },
     });
 
-    // 3. Guardar el Pedido, actualizar la Mesa y encolar el Trabajo de Impresión vinculados a este Tenant
-    const [order, table, printJob] = await prisma.$transaction([
+    // 3. Dividir comanda en bebidas y comida según la configuración
+    const drinksCategoryId = tenant.drinksCategoryId;
+    const drinksItems = items.filter(item => item.categoryId === drinksCategoryId);
+    const otherItems = items.filter(item => item.categoryId !== drinksCategoryId);
+
+    const drinksTotal = drinksItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const otherTotal = otherItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+    const tableNum = parseInt(tableId.replace(/\D/g, '')) || 1;
+
+    // Operaciones de base de datos en transacción única
+    const transactionOperations: any[] = [
       prisma.order.create({
         data: {
           tableId,
           items: items as any,
           total,
           tenantId: tenant.id,
-          waiterId: waiterId || null, // Guardar la asociación del camarero
+          waiterId: waiterId || null,
         },
         include: {
           table: true,
@@ -68,17 +80,79 @@ export async function POST(request: Request) {
         where: { id: tableId },
         data: { status: 'BUSY' },
       }),
-      prisma.printJob.create({
-        data: {
-          tableNum: parseInt(tableId.replace(/\D/g, '')) || 1,
-          items: items as any,
-          total,
-          tenantId: tenant.id,
-        },
-      }),
-    ]);
+    ];
 
-    return NextResponse.json({ success: true, orderId: order.id, printJobId: printJob.id }, { status: 200 });
+    // Lógica para crear trabajos de impresión (PrintJob)
+    if (tenant.hasTwoPrinters) {
+      // 2 Impresoras (Barra y Cocina)
+      if (drinksItems.length > 0) {
+        transactionOperations.push(
+          prisma.printJob.create({
+            data: {
+              tableNum,
+              items: drinksItems as any,
+              total: drinksTotal,
+              type: 'KITCHEN',
+              printerIp: tenant.barPrinterIp,
+              printerPort: tenant.barPrinterPort,
+              tenantId: tenant.id,
+            },
+          })
+        );
+      }
+      if (otherItems.length > 0) {
+        transactionOperations.push(
+          prisma.printJob.create({
+            data: {
+              tableNum,
+              items: otherItems as any,
+              total: otherTotal,
+              type: 'KITCHEN',
+              printerIp: tenant.kitchenPrinterIp,
+              printerPort: tenant.kitchenPrinterPort,
+              tenantId: tenant.id,
+            },
+          })
+        );
+      }
+    } else {
+      // 1 Impresora (Solo Barra) - Se divide en 2 tickets consecutivos para la misma impresora
+      if (drinksItems.length > 0) {
+        transactionOperations.push(
+          prisma.printJob.create({
+            data: {
+              tableNum,
+              items: drinksItems as any,
+              total: drinksTotal,
+              type: 'KITCHEN',
+              printerIp: tenant.barPrinterIp,
+              printerPort: tenant.barPrinterPort,
+              tenantId: tenant.id,
+            },
+          })
+        );
+      }
+      if (otherItems.length > 0) {
+        transactionOperations.push(
+          prisma.printJob.create({
+            data: {
+              tableNum,
+              items: otherItems as any,
+              total: otherTotal,
+              type: 'KITCHEN',
+              printerIp: tenant.barPrinterIp,
+              printerPort: tenant.barPrinterPort,
+              tenantId: tenant.id,
+            },
+          })
+        );
+      }
+    }
+
+    const results = await prisma.$transaction(transactionOperations);
+    const order = results[0];
+
+    return NextResponse.json({ success: true, orderId: order.id }, { status: 200 });
   } catch (error: any) {
     console.error('Error procesando pedido:', error);
     return NextResponse.json(

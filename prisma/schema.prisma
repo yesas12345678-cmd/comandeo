@@ -8,19 +8,25 @@ generator client {
 }
 
 model Tenant {
-  id            String     @id @default(uuid())
-  name          String
-  slug          String     @unique // El subdominio para la URL (ej: "barpaco")
-  apiKey        String     @unique @default(uuid()) // Token secreto para el agente de impresión
-  adminUsername String     @default("admin")
-  adminPassword String     @default("admin123")
-  createdAt     DateTime   @default(now())
-  categories    Category[]
-  products      Product[]
-  tables        Table[]
-  orders        Order[]
-  printJobs     PrintJob[]
-  waiters       Waiter[]
+  id                 String     @id @default(uuid())
+  name               String
+  slug               String     @unique // El subdominio para la URL (ej: "barpaco")
+  apiKey             String     @unique @default(uuid()) // Token secreto para el agente de impresión
+  adminUsername      String     @default("admin")
+  adminPassword      String     @default("admin123")
+  hasTwoPrinters     Boolean    @default(false)
+  drinksCategoryId   String?
+  barPrinterIp       String     @default("192.168.1.100")
+  barPrinterPort     Int        @default(9100)
+  kitchenPrinterIp   String     @default("192.168.1.101")
+  kitchenPrinterPort Int        @default(9100)
+  createdAt          DateTime   @default(now())
+  categories         Category[]
+  products           Product[]
+  tables             Table[]
+  orders             Order[]
+  printJobs          PrintJob[]
+  waiters            Waiter[]
 }
 
 model Category {
@@ -105,13 +111,15 @@ enum PrintJobType {
 }
 
 model PrintJob {
-  id        String       @id @default(uuid())
-  tableNum  Int
-  items     Json
-  total     Float
-  printed   Boolean      @default(false)
-  type      PrintJobType @default(KITCHEN)
-  createdAt DateTime     @default(now())
-  tenantId  String
-  tenant    Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id          String       @id @default(uuid())
+  tableNum    Int
+  items       Json
+  total       Float
+  printed     Boolean      @default(false)
+  type        PrintJobType @default(KITCHEN)
+  printerIp   String?
+  printerPort Int?
+  createdAt   DateTime     @default(now())
+  tenantId    String
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }

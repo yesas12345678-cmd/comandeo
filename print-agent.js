@@ -56,7 +56,12 @@ function printTicket(job, tenantName) {
     const client = new net.Socket();
     client.setTimeout(5000); // 5 segundos max de espera de conexión
 
-    client.connect(PRINTER_PORT, PRINTER_IP, () => {
+    const ip = job.printerIp || PRINTER_IP;
+    const port = job.printerPort || PRINTER_PORT;
+
+    console.log(`[Impresora] Conectando a ${ip}:${port} para trabajo ${job.id} (${job.type})...`);
+
+    client.connect(port, ip, () => {
       try {
         const ESC = 0x1B;
         const GS = 0x1D;

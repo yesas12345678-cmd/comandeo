@@ -51,6 +51,9 @@ export default function TenantAdminDashboardClient({ tenantSlug, bypassAuth = fa
   const [tables, setTables] = useState<Table[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [tenantName, setTenantName] = useState('Administración');
+  const [tenantId, setTenantId] = useState('');
+  const [drinksCategoryId, setDrinksCategoryId] = useState('');
+  const [hasTwoPrinters, setHasTwoPrinters] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // Estados de formularios
@@ -134,6 +137,9 @@ export default function TenantAdminDashboardClient({ tenantSlug, bypassAuth = fa
       if (dataInit.success) {
         setTables(dataInit.tables);
         setTenantName(dataInit.tenantName);
+        setTenantId(dataInit.tenantId);
+        setDrinksCategoryId(dataInit.drinksCategoryId || '');
+        setHasTwoPrinters(dataInit.hasTwoPrinters);
       }
     } catch (err) {
       console.error('Error al cargar datos del panel:', err);
@@ -395,8 +401,35 @@ export default function TenantAdminDashboardClient({ tenantSlug, bypassAuth = fa
     );
   };
 
+  const handleUpdateDrinksCategory = async (newId: string) => {
+    if (!tenantId) return;
+    setDrinksCategoryId(newId);
+    setSuccessMsg('');
+    setErrorMsg('');
+    try {
+      const res = await fetch('/api/admin/tenants', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: tenantId, drinksCategoryId: newId || null })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSuccessMsg('Carpeta de bebidas guardada correctamente.');
+      } else {
+        setErrorMsg(data.error || 'Error al guardar la carpeta de bebidas.');
+      }
+    } catch (err) {
+      setErrorMsg('Error de red al actualizar la carpeta de bebidas.');
+    }
+  };
+
   const totalSales = orders.reduce((sum, order) => sum + order.total, 0);
   const averageTicket = orders.length > 0 ? totalSales / orders.length : 0;
+
+  const totalMinutesSaved = orders.length * 2;
+  const formattedTimeSaved = totalMinutesSaved >= 60
+    ? `${Math.floor(totalMinutesSaved / 60)}h ${totalMinutesSaved % 60}m`
+    : `${totalMinutesSaved} min`;
 
   // Calcular ranking de productos más vendidos
   const getProductRanking = () => {
@@ -525,7 +558,7 @@ export default function TenantAdminDashboardClient({ tenantSlug, bypassAuth = fa
           {[
             { id: 'sales', label: '📊 Resumen de Ventas' },
             { id: 'products', label: '🍔 Productos' },
-            { id: 'categories', label: '📁 Categorías' },
+            { id: 'categories', label: '📁 Carpetas' },
             { id: 'waiters', label: '👥 Camareros' },
             { id: 'tables', label: '🪑 Mesas' }
           ].map((tab) => (
@@ -546,7 +579,7 @@ export default function TenantAdminDashboardClient({ tenantSlug, bypassAuth = fa
         {/* PESTAÑA: VENTAS */}
         {activeTab === 'sales' && (
           <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md">
                 <span className="text-slate-400 text-xs uppercase font-extrabold tracking-wider">Ingresos del Día</span>
                 <p className="text-3xl font-black text-white mt-2">{totalSales.toFixed(2)}€</p>
@@ -558,6 +591,13 @@ export default function TenantAdminDashboardClient({ tenantSlug, bypassAuth = fa
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md">
                 <span className="text-slate-400 text-xs uppercase font-extrabold tracking-wider">Ticket Medio</span>
                 <p className="text-3xl font-black text-white mt-2">{averageTicket.toFixed(2)}€</p>
+              </div>
+              <div className="bg-slate-900 border border-blue-500/35 rounded-xl p-6 shadow-md bg-gradient-to-br from-slate-900 to-blue-950/20">
+                <span className="text-blue-450 text-xs uppercase font-extrabold tracking-wider flex items-center gap-1.5">
+                  ⚡ Tiempo Ahorrado Hoy
+                </span>
+                <p className="text-3xl font-black text-blue-450 mt-2">{formattedTimeSaved}</p>
+                <span className="text-[10px] text-slate-500 block mt-1">Estimación: 2 min ahorrados por comanda.</span>
               </div>
             </div>
 
@@ -710,37 +750,63 @@ export default function TenantAdminDashboardClient({ tenantSlug, bypassAuth = fa
           </div>
         )}
 
-        {/* PESTAÑA: CATEGORÍAS */}
+        {/* PESTAÑA: CARPETAS */}
         {activeTab === 'categories' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md h-fit">
-              <h2 className="text-lg font-black text-white mb-4">Nueva Categoría</h2>
-              <form onSubmit={handleAddCategory} className="space-y-4">
-                <div>
-                  <label htmlFor="cat-name" className="text-slate-400 text-xs font-bold block mb-1">Nombre</label>
-                  <input
-                    id="cat-name"
-                    type="text"
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                    placeholder="Ej. Postres Caseros"
-                    className="w-full bg-slate-950 border border-slate-850 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                    required
-                  />
+            <div className="space-y-6">
+              {/* Nueva Carpeta */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md h-fit">
+                <h2 className="text-lg font-black text-white mb-4">Nueva Carpeta (Categoría)</h2>
+                <form onSubmit={handleAddCategory} className="space-y-4">
+                  <div>
+                    <label htmlFor="cat-name" className="text-slate-400 text-xs font-bold block mb-1">Nombre</label>
+                    <input
+                      id="cat-name"
+                      type="text"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="Ej. Postres Caseros"
+                      className="w-full bg-slate-950 border border-slate-850 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                      required
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-lg text-sm transition-all cursor-pointer"
+                  >
+                    Crear Carpeta
+                  </button>
+                </form>
+              </div>
+
+              {/* Ajustes Carpeta Bebidas */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md h-fit">
+                <h2 className="text-sm font-black text-white mb-2 uppercase tracking-wider">📁 Carpeta de Bebidas</h2>
+                <p className="text-slate-400 text-xs mb-4 leading-relaxed">
+                  Indica cuál es la carpeta de bebidas de tu bar. Esto permitirá dividir la bebida de la comida al mandar los tickets a las impresoras.
+                </p>
+                <div className="space-y-2">
+                  <label className="text-slate-450 text-[10px] font-bold block uppercase tracking-wider">Selecciona la Carpeta</label>
+                  <select
+                    value={drinksCategoryId}
+                    onChange={(e) => handleUpdateDrinksCategory(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:ring-1 focus:ring-blue-500 outline-none font-bold cursor-pointer"
+                  >
+                    <option value="">-- Sin dividir / Ninguna --</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <button
-                  type="submit"
-                  className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-lg text-sm transition-all"
-                >
-                  Crear Categoría
-                </button>
-              </form>
+              </div>
             </div>
 
             <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md">
-              <h2 className="text-lg font-black text-white mb-4">Categorías Creadas</h2>
+              <h2 className="text-lg font-black text-white mb-4">Carpetas (Categorías) Creadas</h2>
               {categories.length === 0 ? (
-                <p className="text-slate-500 text-sm text-center py-6">No has creado categorías todavía.</p>
+                <p className="text-slate-500 text-sm text-center py-6">No has creado carpetas todavía.</p>
               ) : (
                 <div className="space-y-3">
                   {categories.map((cat) => (
@@ -748,7 +814,7 @@ export default function TenantAdminDashboardClient({ tenantSlug, bypassAuth = fa
                       <span className="font-extrabold text-white">{cat.name}</span>
                       <button
                         onClick={() => handleDeleteItem(`/api/admin/categories/${cat.id}`, 'categoría')}
-                        className="px-2 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-450 hover:text-rose-300 rounded text-xs transition-colors font-bold"
+                        className="px-2 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-450 hover:text-rose-300 rounded text-xs transition-colors font-bold cursor-pointer"
                       >
                         Eliminar
                       </button>

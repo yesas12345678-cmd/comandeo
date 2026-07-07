@@ -31,11 +31,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Mesa no encontrada.' }, { status: 404 });
     }
 
-    // Actualizar el estado de la mesa a libre (FREE)
-    await prisma.table.update({
-      where: { id: tableId },
-      data: { status: 'FREE' }
-    });
+    // Transacción: marcar comanda como cobrada y liberar mesa
+    await prisma.$transaction([
+      prisma.order.updateMany({
+        where: {
+          tableId,
+          tenantId: tenant.id,
+          status: 'PENDING',
+        },
+        data: {
+          status: 'PAID',
+        },
+      }),
+      prisma.table.update({
+        where: { id: tableId },
+        data: { status: 'FREE' }
+      })
+    ]);
 
     return NextResponse.json({ success: true, message: 'Mesa liberada con éxito.' }, { status: 200 });
   } catch (error: any) {

@@ -38,6 +38,7 @@ export default function PDATerminal({ tenantSlug = 'barpaco' }: { tenantSlug?: s
   const [waiters, setWaiters] = useState<Waiter[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedTableId, setSelectedTableId] = useState<string>('');
+  const [isTableModalOpen, setIsTableModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -256,20 +257,18 @@ export default function PDATerminal({ tenantSlug = 'barpaco' }: { tenantSlug?: s
     }
   };
 
-  // Cobrar y liberar mesa (Checkout)
-  const checkoutTable = async (method: 'CASH' | 'CARD') => {
+  // Encolar impresión del Ticket de Cuenta (Factura simplificada)
+  const printReceiptTicket = async () => {
     if (!selectedTableId) return;
     setIsSending(true);
     setMessage(null);
 
     try {
-      const response = await fetch('/api/tables/checkout', {
+      const response = await fetch(`/api/tables/${selectedTableId}/receipt`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'x-tenant-slug': tenantSlug
-        },
-        body: JSON.stringify({ tableId: selectedTableId, paymentMethod: method }),
+        }
       });
 
       const data = await response.json();
@@ -277,7 +276,40 @@ export default function PDATerminal({ tenantSlug = 'barpaco' }: { tenantSlug?: s
       if (response.ok && data.success) {
         setMessage({ 
           type: 'success', 
-          text: `Mesa cobrada en ${method === 'CASH' ? 'EFECTIVO' : 'TARJETA'} y liberada.` 
+          text: 'Ticket de cuenta encolado para impresión en Barra.' 
+        });
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Fallo al encolar el ticket de cuenta.' });
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Error al conectar con el servidor.' });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  // Liberar mesa y marcar comandas como cobradas
+  const releaseTable = async () => {
+    if (!selectedTableId) return;
+    setIsSending(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch('/api/tables/release', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-slug': tenantSlug
+        },
+        body: JSON.stringify({ tableId: selectedTableId }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setMessage({ 
+          type: 'success', 
+          text: 'Mesa liberada y cobrada con éxito.' 
         });
         
         // Actualizar el estado local de la mesa a FREE
@@ -286,7 +318,7 @@ export default function PDATerminal({ tenantSlug = 'barpaco' }: { tenantSlug?: s
         );
         setBillDetails(null);
       } else {
-        setMessage({ type: 'error', text: data.error || 'Fallo al procesar el cobro.' });
+        setMessage({ type: 'error', text: data.error || 'Fallo al liberar la mesa.' });
       }
     } catch (err) {
       setMessage({ type: 'error', text: 'Error al conectar con el servidor.' });
@@ -424,36 +456,23 @@ export default function PDATerminal({ tenantSlug = 'barpaco' }: { tenantSlug?: s
           </div>
         )}
 
-        {/* Selector de Mesas Desplegable */}
+        {/* Selector de Mesas Interactivo */}
         <div>
-          <label htmlFor="table-select" className="text-xs uppercase tracking-wider text-slate-400 font-bold block mb-2">
+          <label className="text-xs uppercase tracking-wider text-slate-400 font-bold block mb-2">
             Selección de Mesa
           </label>
-          <div className="relative">
-            <select
-              id="table-select"
-              value={selectedTableId}
-              onChange={(e) => {
-                setSelectedTableId(e.target.value);
-                setMessage(null);
-              }}
-              className="w-full appearance-none bg-slate-800 text-white rounded-xl border border-slate-700/60 px-4 py-3 font-extrabold outline-none focus:ring-2 focus:ring-blue-500 text-lg shadow-md cursor-pointer transition-all duration-150 pr-10"
-            >
-              {tables.map((table) => {
-                const isBusy = table.status === 'BUSY';
-                return (
-                  <option key={table.id} value={table.id} className="font-extrabold bg-slate-900 text-slate-100">
-                    Mesa {table.number} {isBusy ? '🔴 (Ocupada - Ver Cuenta)' : '🟢 (Libre)'}
-                  </option>
-                );
-              })}
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-400">
-              <svg className="fill-current h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
-              </svg>
-            </div>
-          </div>
+          <button
+            onClick={() => setIsTableModalOpen(true)}
+            className="w-full flex items-center justify-between bg-slate-800 hover:bg-slate-750 text-white rounded-xl border border-slate-700/60 px-4 py-3 font-extrabold text-lg shadow-md cursor-pointer transition-all duration-155 active:scale-98"
+          >
+            <span>🪑 {selectedTable ? `Mesa ${selectedTable.number}` : 'Seleccionar Mesa'}</span>
+            <span className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-400">
+                {selectedTable?.status === 'BUSY' ? 'Ocupada' : 'Libre'}
+              </span>
+              <span className={`w-3.5 h-3.5 rounded-full shadow-inner ${selectedTable?.status === 'BUSY' ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+            </span>
+          </button>
         </div>
 
         {/* Panel de Cobro Detallado si la mesa está Ocupada */}
@@ -496,18 +515,18 @@ export default function PDATerminal({ tenantSlug = 'barpaco' }: { tenantSlug?: s
                 {/* Acciones de Cobro */}
                 <div className="grid grid-cols-2 gap-2 pt-1">
                   <button
-                    onClick={() => checkoutTable('CASH')}
+                    onClick={printReceiptTicket}
                     disabled={isSending}
-                    className="py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-800 disabled:text-slate-600 text-slate-950 font-black rounded-lg text-xs transition-all uppercase tracking-wider flex items-center justify-center gap-1 shadow-md"
+                    className="py-2.5 bg-amber-500 hover:bg-amber-400 disabled:bg-slate-800 disabled:text-slate-600 text-slate-950 font-black rounded-lg text-xs transition-all uppercase tracking-wider flex items-center justify-center gap-1 shadow-md cursor-pointer"
                   >
-                    💵 Efectivo
+                    🖨️ Imprimir Ticket
                   </button>
                   <button
-                    onClick={() => checkoutTable('CARD')}
+                    onClick={releaseTable}
                     disabled={isSending}
-                    className="py-2.5 bg-blue-500 hover:bg-blue-400 disabled:bg-slate-800 disabled:text-slate-600 text-white font-black rounded-lg text-xs transition-all uppercase tracking-wider flex items-center justify-center gap-1 shadow-md"
+                    className="py-2.5 bg-rose-600 hover:bg-rose-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-black rounded-lg text-xs transition-all uppercase tracking-wider flex items-center justify-center gap-1 shadow-md cursor-pointer"
                   >
-                    💳 Tarjeta
+                    🔓 Liberar Mesa
                   </button>
                 </div>
               </div>
@@ -715,6 +734,70 @@ export default function PDATerminal({ tenantSlug = 'barpaco' }: { tenantSlug?: s
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE SELECCIÓN DE MESA (GRID INTERACTIVO) */}
+      {isTableModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+            {/* Header */}
+            <div className="px-6 py-4 bg-slate-850 border-b border-slate-800 flex items-center justify-between">
+              <div>
+                <h3 className="font-black text-white text-base">Seleccionar Mesa</h3>
+                <p className="text-[10px] text-slate-400">Púlsa una mesa para empezar a tomar nota.</p>
+              </div>
+              <button
+                onClick={() => setIsTableModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center font-bold text-sm transition-all cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Grid of Tables */}
+            <div className="p-6 overflow-y-auto">
+              {tables.length === 0 ? (
+                <p className="text-slate-500 text-xs text-center py-6">No hay mesas registradas.</p>
+              ) : (
+                <div className="grid grid-cols-3 gap-3">
+                  {tables.map((table) => {
+                    const isBusy = table.status === 'BUSY';
+                    return (
+                      <button
+                        key={table.id}
+                        onClick={() => {
+                          setSelectedTableId(table.id);
+                          setIsTableModalOpen(false);
+                          setMessage(null);
+                        }}
+                        className={`aspect-square flex flex-col items-center justify-center rounded-xl border text-center transition-all cursor-pointer select-none active:scale-95 shadow-md ${
+                          isBusy
+                            ? 'bg-rose-500/10 hover:bg-rose-500/15 border-rose-500/25 text-rose-450 hover:border-rose-500/40'
+                            : 'bg-emerald-500/10 hover:bg-emerald-500/15 border-emerald-500/25 text-emerald-400 hover:border-emerald-500/40'
+                        }`}
+                      >
+                        <span className="text-2xl font-black">{table.number}</span>
+                        <span className="text-[8px] font-extrabold uppercase mt-1 tracking-wider opacity-80">
+                          {isBusy ? 'Ocupada' : 'Libre'}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Leyenda footer */}
+            <div className="px-6 py-3 bg-slate-950/40 border-t border-slate-850 flex justify-center gap-4 text-[9px] uppercase tracking-wider font-extrabold text-slate-400">
+              <div className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 block" /> Libre
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 block" /> Ocupada
+              </div>
+            </div>
           </div>
         </div>
       )}

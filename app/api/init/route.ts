@@ -43,7 +43,10 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
+      tenantId: tenant.id,
       tenantName: tenant.name,
+      drinksCategoryId: tenant.drinksCategoryId,
+      hasTwoPrinters: tenant.hasTwoPrinters,
       products,
       categories,
       tables,
