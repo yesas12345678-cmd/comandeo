@@ -52,6 +52,10 @@ export default function PDATerminal({ tenantSlug = 'barpaco' }: { tenantSlug?: s
   const [billDetails, setBillDetails] = useState<{ items: any[]; total: number } | null>(null);
   const [isBillLoading, setIsBillLoading] = useState(false);
 
+  // Estados para modal de observaciones de producto
+  const [noteModalProduct, setNoteModalProduct] = useState<Product | null>(null);
+  const [noteModalText, setNoteModalText] = useState('');
+
   // Cargar datos iniciales desde la base de datos
   useEffect(() => {
     async function loadData() {
@@ -116,44 +120,42 @@ export default function PDATerminal({ tenantSlug = 'barpaco' }: { tenantSlug?: s
     }
   };
 
-  const addToCart = (product: Product) => {
+  const addToCart = (product: Product, note?: string) => {
     setCart((prevCart) => {
-      const existing = prevCart.find((item) => item.id === product.id);
+      const existing = prevCart.find((item) => item.id === product.id && item.note === note);
       if (existing) {
         return prevCart.map((item) =>
-          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+          item.id === product.id && item.note === note
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
         );
       }
-      return [...prevCart, { ...product, quantity: 1 }];
+      return [...prevCart, { ...product, quantity: 1, note }];
     });
   };
 
-  const removeFromCart = (productId: string) => {
-    setCart((prevCart) =>
-      prevCart
-        .map((item) => (item.id === productId ? { ...item, quantity: item.quantity - 1 } : item))
-        .filter((item) => item.quantity > 0)
-    );
+  const removeFromCart = (productId: string, note?: string) => {
+    setCart((prevCart) => {
+      const itemIndex = prevCart.findIndex((item) => item.id === productId && item.note === note);
+      if (itemIndex === -1) return prevCart;
+
+      const item = prevCart[itemIndex];
+      if (item.quantity > 1) {
+        return prevCart.map((it, idx) =>
+          idx === itemIndex ? { ...it, quantity: it.quantity - 1 } : it
+        );
+      } else {
+        return prevCart.filter((_, idx) => idx !== itemIndex);
+      }
+    });
+  };
+
+  const openProductNoteModal = (product: Product) => {
+    setNoteModalProduct(product);
+    setNoteModalText('');
   };
 
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-
-  const addNoteToItem = (productId: string, note: string) => {
-    setCart((prevCart) =>
-      prevCart.map((item) =>
-        item.id === productId ? { ...item, note: note || undefined } : item
-      )
-    );
-  };
-
-  const handleAddNote = (productId: string) => {
-    const item = cart.find((i) => i.id === productId);
-    if (!item) return;
-    const note = prompt(`Observación para ${item.name}:`, item.note || '');
-    if (note !== null) {
-      addNoteToItem(productId, note.trim());
-    }
-  };
 
   const filteredProducts = selectedCategoryId === 'ALL'
     ? products
@@ -575,14 +577,28 @@ export default function PDATerminal({ tenantSlug = 'barpaco' }: { tenantSlug?: s
             ) : (
               <div className="grid grid-cols-2 gap-3">
                 {filteredProducts.map((product) => (
-                  <button
+                  <div
                     key={product.id}
-                    onClick={() => addToCart(product)}
-                    className="flex flex-col items-center justify-between p-4 bg-slate-800 hover:bg-slate-700 active:scale-95 transition-all duration-150 rounded-xl border border-slate-700 h-28 text-left group shadow-sm hover:shadow-md"
+                    className="relative flex flex-col justify-between p-4 bg-slate-800 hover:bg-slate-750 rounded-xl border border-slate-700 h-28 text-left group shadow-sm transition-all duration-150"
                   >
-                    <span className="text-sm font-bold w-full leading-tight text-slate-100 group-hover:text-white transition-colors">{product.name}</span>
-                    <span className="text-blue-400 font-extrabold w-full text-right text-sm">{product.price.toFixed(2)}€</span>
-                  </button>
+                    {/* Main Clickable Area to add directly */}
+                    <button
+                      onClick={() => addToCart(product)}
+                      className="absolute inset-0 w-full h-full text-left p-4 flex flex-col justify-between cursor-pointer rounded-xl"
+                    >
+                      <span className="text-sm font-bold w-full pr-6 leading-tight text-slate-100 group-hover:text-white transition-colors">{product.name}</span>
+                      <span className="text-blue-400 font-extrabold w-full text-right text-sm">{product.price.toFixed(2)}€</span>
+                    </button>
+                    
+                    {/* Small pencil icon in the top right corner */}
+                    <button
+                      onClick={() => openProductNoteModal(product)}
+                      className="absolute top-2 right-2 w-7 h-7 rounded-lg bg-slate-900/60 hover:bg-blue-600 hover:text-white text-slate-400 flex items-center justify-center text-xs transition-all border border-slate-700/50 cursor-pointer z-10"
+                      title="Añadir con observación"
+                    >
+                      ✏️
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
@@ -600,7 +616,7 @@ export default function PDATerminal({ tenantSlug = 'barpaco' }: { tenantSlug?: s
               </div>
             ) : (
               cart.map((item) => (
-                <div key={item.id} className="flex items-center justify-between py-2 border-b border-slate-800/60 gap-3">
+                <div key={`${item.id}-${item.note || ''}`} className="flex items-center justify-between py-2 border-b border-slate-800/60 gap-3">
                   <div className="flex-1">
                     <div className="flex flex-col">
                       <span className="font-bold text-white text-sm">{item.name}</span>
@@ -609,12 +625,6 @@ export default function PDATerminal({ tenantSlug = 'barpaco' }: { tenantSlug?: s
                           ✍️ {item.note}
                         </span>
                       )}
-                      <button
-                        onClick={() => handleAddNote(item.id)}
-                        className="text-[10px] text-blue-400 hover:text-blue-300 font-bold mt-1 text-left underline"
-                      >
-                        {item.note ? 'Editar nota' : 'Agregar observación...'}
-                      </button>
                     </div>
                     <span className="text-slate-400 text-xs mt-1 block">
                       {item.quantity} x {item.price.toFixed(2)}€
@@ -622,15 +632,15 @@ export default function PDATerminal({ tenantSlug = 'barpaco' }: { tenantSlug?: s
                   </div>
                   <div className="flex items-center gap-3">
                     <button
-                      onClick={() => removeFromCart(item.id)}
-                      className="w-8 h-8 rounded-full bg-slate-850 hover:bg-rose-500/20 hover:text-rose-400 flex items-center justify-center text-slate-400 font-extrabold transition-colors"
+                      onClick={() => removeFromCart(item.id, item.note)}
+                      className="w-8 h-8 rounded-full bg-slate-850 hover:bg-rose-500/20 hover:text-rose-400 flex items-center justify-center text-slate-400 font-extrabold transition-colors cursor-pointer"
                     >
                       -
                     </button>
                     <span className="font-extrabold w-4 text-center">{item.quantity}</span>
                     <button
-                      onClick={() => addToCart(item)}
-                      className="w-8 h-8 rounded-full bg-slate-850 hover:bg-emerald-500/20 hover:text-emerald-400 flex items-center justify-center text-slate-400 font-extrabold transition-colors"
+                      onClick={() => addToCart(item, item.note)}
+                      className="w-8 h-8 rounded-full bg-slate-850 hover:bg-emerald-500/20 hover:text-emerald-400 flex items-center justify-center text-slate-400 font-extrabold transition-colors cursor-pointer"
                     >
                       +
                     </button>
@@ -661,6 +671,53 @@ export default function PDATerminal({ tenantSlug = 'barpaco' }: { tenantSlug?: s
           {isSending ? 'Enviando...' : 'Enviar a Cocina'}
         </button>
       </footer>
+
+      {/* Modal para añadir producto con nota */}
+      {noteModalProduct && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-sm p-6 shadow-2xl relative animate-scaleUp">
+            <h3 className="text-lg font-black text-white mb-1">Observación para:</h3>
+            <span className="text-blue-400 font-black block text-md mb-4">{noteModalProduct.name}</span>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                addToCart(noteModalProduct, noteModalText.trim() || undefined);
+                setNoteModalProduct(null);
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="text-slate-450 text-xs font-bold block mb-1.5 uppercase tracking-wider">Escribe la personalización</label>
+                <input
+                  type="text"
+                  value={noteModalText}
+                  onChange={(e) => setNoteModalText(e.target.value)}
+                  placeholder="Ej. Sin cebolla, sin queso, muy hecho..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none font-semibold"
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setNoteModalProduct(null)}
+                  className="flex-1 py-3 bg-slate-800 hover:bg-slate-750 text-slate-350 font-bold rounded-xl text-xs uppercase tracking-wider transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-450 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider transition-all cursor-pointer"
+                >
+                  Añadir a la comanda
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
