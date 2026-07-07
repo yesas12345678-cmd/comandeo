@@ -19,6 +19,9 @@ interface Waiter {
   id: string;
   name: string;
   pin: string;
+  allowedDays?: string;
+  startHour?: string;
+  endHour?: string;
 }
 
 interface Table {
@@ -64,6 +67,16 @@ export default function TenantAdminDashboardClient({ tenantSlug, bypassAuth = fa
 
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Estados para edición de camarero (Modal de Engranaje)
+  const [selectedWaiterForEdit, setSelectedWaiterForEdit] = useState<Waiter | null>(null);
+  const [editWaiterName, setEditWaiterName] = useState('');
+  const [editWaiterPin, setEditWaiterPin] = useState('');
+  const [editWaiterAllowedDays, setEditWaiterAllowedDays] = useState<string[]>([]);
+  const [editWaiterStartHour, setEditWaiterStartHour] = useState('00:00');
+  const [editWaiterEndHour, setEditWaiterEndHour] = useState('23:59');
+  const [isSavingWaiter, setIsSavingWaiter] = useState(false);
+  const [editWaiterError, setEditWaiterError] = useState('');
 
   // Verificar autorización al cargar
   useEffect(() => {
@@ -325,6 +338,61 @@ export default function TenantAdminDashboardClient({ tenantSlug, bypassAuth = fa
   const handleLogout = () => {
     sessionStorage.removeItem(`tenant_auth_${tenantSlug}`);
     setIsAuthorized(false);
+  };
+
+  // Abrir modal de edición
+  const openEditWaiterModal = (w: Waiter) => {
+    setSelectedWaiterForEdit(w);
+    setEditWaiterName(w.name);
+    setEditWaiterPin(w.pin);
+    setEditWaiterAllowedDays(w.allowedDays ? w.allowedDays.split(',') : ['1','2','3','4','5','6','7']);
+    setEditWaiterStartHour(w.startHour || '00:00');
+    setEditWaiterEndHour(w.endHour || '23:59');
+    setEditWaiterError('');
+  };
+
+  // Guardar cambios del camarero
+  const handleUpdateWaiter = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedWaiterForEdit) return;
+    setIsSavingWaiter(true);
+    setEditWaiterError('');
+
+    try {
+      const res = await fetch(`/api/admin/waiters/${selectedWaiterForEdit.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-slug': tenantSlug
+        },
+        body: JSON.stringify({
+          name: editWaiterName,
+          pin: editWaiterPin,
+          allowedDays: editWaiterAllowedDays.join(','),
+          startHour: editWaiterStartHour,
+          endHour: editWaiterEndHour
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSuccessMsg(`Camarero "${editWaiterName}" actualizado con éxito.`);
+        setSelectedWaiterForEdit(null);
+        loadData();
+      } else {
+        setEditWaiterError(data.error || 'Error al actualizar el camarero.');
+      }
+    } catch (err) {
+      setEditWaiterError('Error de conexión.');
+    } finally {
+      setIsSavingWaiter(false);
+    }
+  };
+
+  // Manejar cambios de día permitido en checkbox
+  const handleDayCheckboxChange = (day: string) => {
+    setEditWaiterAllowedDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
+    );
   };
 
   const totalSales = orders.reduce((sum, order) => sum + order.total, 0);
@@ -746,12 +814,21 @@ export default function TenantAdminDashboardClient({ tenantSlug, bypassAuth = fa
                           PIN de Acceso: <span className="text-blue-400 font-extrabold">{w.pin}</span>
                         </span>
                       </div>
-                      <button
-                        onClick={() => handleDeleteItem(`/api/admin/waiters/${w.id}`, 'camarero')}
-                        className="px-2 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-450 hover:text-rose-300 rounded text-xs transition-colors font-bold"
-                      >
-                        Eliminar
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => openEditWaiterModal(w)}
+                          className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition-all border border-slate-700/80 flex items-center justify-center cursor-pointer"
+                          title="Ajustes de Camarero"
+                        >
+                          ⚙️
+                        </button>
+                        <button
+                          onClick={() => handleDeleteItem(`/api/admin/waiters/${w.id}`, 'camarero')}
+                          className="px-2 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-450 hover:text-rose-300 rounded text-xs transition-colors font-bold h-9 cursor-pointer"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -818,6 +895,131 @@ export default function TenantAdminDashboardClient({ tenantSlug, bypassAuth = fa
           </div>
         )}
       </main>
+
+      {/* Modal Ajustes de Camarero */}
+      {selectedWaiterForEdit && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg p-6 md:p-8 shadow-2xl relative animate-scaleUp max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-black text-white mb-2">Ajustes de: {selectedWaiterForEdit.name}</h3>
+            <p className="text-xs text-slate-400 mb-6">Modifica el acceso, la contraseña y las restricciones de este camarero.</p>
+
+            {editWaiterError && (
+              <div className="p-3 bg-rose-500/10 text-rose-450 border border-rose-500/20 rounded-xl text-xs font-semibold text-center mb-5">
+                {editWaiterError}
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateWaiter} className="space-y-5">
+              <div>
+                <label className="text-slate-400 text-xs font-bold block mb-1">Nombre</label>
+                <input
+                  type="text"
+                  value={editWaiterName}
+                  onChange={(e) => setEditWaiterName(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-400 text-xs font-bold block mb-1">PIN (4 números)</label>
+                <input
+                  type="text"
+                  maxLength={4}
+                  value={editWaiterPin}
+                  onChange={(e) => setEditWaiterPin(e.target.value.replace(/\D/g, ''))}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none font-mono tracking-widest text-lg font-bold"
+                  required
+                />
+              </div>
+
+              {/* Días Permitidos */}
+              <div>
+                <label className="text-slate-400 text-xs font-bold block mb-2">Días Permitidos de Acceso</label>
+                <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                  {[
+                    { id: '1', name: 'L' },
+                    { id: '2', name: 'M' },
+                    { id: '3', name: 'X' },
+                    { id: '4', name: 'J' },
+                    { id: '5', name: 'V' },
+                    { id: '6', name: 'S' },
+                    { id: '7', name: 'D' }
+                  ].map((day) => {
+                    const isChecked = editWaiterAllowedDays.includes(day.id);
+                    return (
+                      <button
+                        key={day.id}
+                        type="button"
+                        onClick={() => handleDayCheckboxChange(day.id)}
+                        className={`py-2 px-1 rounded-lg text-xs font-extrabold border transition-all ${
+                          isChecked
+                            ? 'bg-blue-600 border-blue-500 text-slate-950'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                        }`}
+                      >
+                        {day.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Rango de Horas */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-slate-400 text-xs font-bold block mb-1">Hora Inicio</label>
+                  <input
+                    type="time"
+                    value={editWaiterStartHour}
+                    onChange={(e) => setEditWaiterStartHour(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none font-bold"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 text-xs font-bold block mb-1">Hora Fin</label>
+                  <input
+                    type="time"
+                    value={editWaiterEndHour}
+                    onChange={(e) => setEditWaiterEndHour(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none font-bold"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Botones de acción */}
+              <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-slate-800">
+                <a
+                  href={`https://wa.me/34641403129?text=Hola,%20necesito%20ayuda%20para%20configurar%20al%20camarero%20${encodeURIComponent(editWaiterName)}%20en%20mi%20bar%20(${encodeURIComponent(tenantName)}).`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-3 bg-slate-850 hover:bg-slate-800 text-slate-350 font-bold rounded-xl text-xs transition-all uppercase tracking-wider text-center flex items-center justify-center gap-1.5 cursor-pointer border border-slate-800/80"
+                >
+                  💬 Soporte
+                </a>
+                <div className="flex gap-2 flex-1">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedWaiterForEdit(null)}
+                    className="flex-1 py-3 bg-slate-800 hover:bg-slate-750 text-slate-350 font-bold rounded-xl text-xs uppercase tracking-wider transition-all cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingWaiter}
+                    className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-450 disabled:bg-slate-800 disabled:text-slate-600 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider transition-all cursor-pointer"
+                  >
+                    {isSavingWaiter ? 'Guardando...' : 'Guardar'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

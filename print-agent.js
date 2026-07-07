@@ -91,6 +91,9 @@ function printTicket(job, tenantName) {
             const nameText = item.name.padEnd(maxNameLen).substring(0, maxNameLen);
 
             client.write(Buffer.from(`${qtyText}${nameText}${priceText}\n`, 'latin1'));
+            if (item.note) {
+              client.write(Buffer.from(`   * NOTA: ${item.note}\n`, 'latin1'));
+            }
           });
 
           // Totalizador
@@ -130,6 +133,9 @@ function printTicket(job, tenantName) {
             const nameText = item.name.padEnd(maxNameLen).substring(0, maxNameLen);
 
             client.write(Buffer.from(`${qtyText}${nameText}\n`, 'latin1'));
+            if (item.note) {
+              client.write(Buffer.from(`  ↳ NOTA: ${item.note.toUpperCase()}\n`, 'latin1'));
+            }
           });
           client.write(Buffer.from('--------------------------------\n\n\n'));
         }

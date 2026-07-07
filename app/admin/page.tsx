@@ -7,6 +7,8 @@ interface Tenant {
   id: string;
   slug: string;
   name: string;
+  adminUsername?: string;
+  adminPassword?: string;
 }
 
 export default function GlobalAdminPage() {
@@ -18,6 +20,14 @@ export default function GlobalAdminPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [selectedTenantSlug, setSelectedTenantSlug] = useState('');
   const [isLoadingTenants, setIsLoadingTenants] = useState(false);
+
+  // States for selected tenant credentials editing
+  const [adminUsername, setAdminUsername] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [isUpdatingCredentials, setIsUpdatingCredentials] = useState(false);
+  const [credMessage, setCredMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const currentTenant = tenants.find((t) => t.slug === selectedTenantSlug);
 
   // Check superadmin session
   useEffect(() => {
@@ -49,6 +59,15 @@ export default function GlobalAdminPage() {
     }
   }, [isSuperAuthorized]);
 
+  // Sync inputs when selected tenant changes
+  useEffect(() => {
+    if (currentTenant) {
+      setAdminUsername(currentTenant.adminUsername || '');
+      setAdminPassword(currentTenant.adminPassword || '');
+      setCredMessage(null);
+    }
+  }, [selectedTenantSlug, tenants]);
+
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (usernameInput === 'zVaito' && passwordInput === 'Manuel1214$') {
@@ -57,6 +76,35 @@ export default function GlobalAdminPage() {
       setLoginError('');
     } else {
       setLoginError('Usuario o contraseña incorrectos.');
+    }
+  };
+
+  const handleUpdateCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentTenant) return;
+    setIsUpdatingCredentials(true);
+    setCredMessage(null);
+    try {
+      const res = await fetch('/api/admin/tenants', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: currentTenant.id,
+          adminUsername,
+          adminPassword
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setCredMessage({ type: 'success', text: 'Credenciales del bar actualizadas con éxito.' });
+        setTenants(prev => prev.map(t => t.id === currentTenant.id ? { ...t, adminUsername, adminPassword } : t));
+      } else {
+        setCredMessage({ type: 'error', text: data.error || 'Error al actualizar credenciales.' });
+      }
+    } catch (err) {
+      setCredMessage({ type: 'error', text: 'Error de red.' });
+    } finally {
+      setIsUpdatingCredentials(false);
     }
   };
 
@@ -164,6 +212,52 @@ export default function GlobalAdminPage() {
           Cerrar Sesión
         </button>
       </div>
+
+      {/* Credenciales del Bar Seleccionado */}
+      {currentTenant && (
+        <div className="bg-slate-900 border-b border-slate-800 p-6 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex-1">
+            <h3 className="text-sm font-black text-white uppercase tracking-wider">Acceso Administrador de: <span className="text-blue-400">{currentTenant.name}</span></h3>
+            <p className="text-slate-400 text-xs mt-1">Configura el usuario y contraseña privados con los que el dueño accede a su panel de bar (/admin).</p>
+          </div>
+          <form onSubmit={handleUpdateCredentials} className="flex flex-col sm:flex-row items-end gap-3 w-full md:w-auto">
+            <div className="w-full sm:w-auto">
+              <label className="text-slate-400 text-[10px] font-bold block mb-1 uppercase tracking-wider">Usuario Admin</label>
+              <input
+                type="text"
+                value={adminUsername}
+                onChange={(e) => setAdminUsername(e.target.value)}
+                className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none w-full sm:w-40 font-bold"
+                required
+              />
+            </div>
+            <div className="w-full sm:w-auto">
+              <label className="text-slate-400 text-[10px] font-bold block mb-1 uppercase tracking-wider">Contraseña Admin</label>
+              <input
+                type="text"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none w-full sm:w-40 font-bold"
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={isUpdatingCredentials}
+              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-850 disabled:text-slate-500 text-slate-950 font-black rounded-lg text-xs uppercase tracking-wider transition-all w-full sm:w-auto cursor-pointer"
+            >
+              {isUpdatingCredentials ? 'Guardando...' : 'Actualizar'}
+            </button>
+          </form>
+          {credMessage && (
+            <div className={`px-4 py-2 rounded-lg text-xs font-bold w-full md:w-auto text-center ${
+              credMessage.type === 'success' ? 'bg-emerald-500/15 text-emerald-450' : 'bg-rose-500/15 text-rose-450'
+            }`}>
+              {credMessage.text}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Embedded Tenant Dashboard */}
       {selectedTenantSlug ? (

@@ -11,7 +11,9 @@ export async function GET(request: Request) {
       select: {
         id: true,
         slug: true,
-        name: true
+        name: true,
+        adminUsername: true,
+        adminPassword: true,
       },
       orderBy: { name: 'asc' }
     });
@@ -19,6 +21,30 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: true, tenants }, { status: 200 });
   } catch (error: any) {
     console.error('Error fetching tenants list:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const body = await request.json();
+    const { id, adminUsername, adminPassword } = body;
+
+    if (!id || !adminUsername || !adminPassword) {
+      return NextResponse.json({ success: false, error: 'Faltan campos obligatorios.' }, { status: 400 });
+    }
+
+    const updatedTenant = await prisma.tenant.update({
+      where: { id },
+      data: {
+        adminUsername,
+        adminPassword,
+      }
+    });
+
+    return NextResponse.json({ success: true, tenant: updatedTenant }, { status: 200 });
+  } catch (error: any) {
+    console.error('Error updating tenant credentials:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

@@ -16,6 +16,7 @@ interface Category {
 
 interface CartItem extends Product {
   quantity: number;
+  note?: string;
 }
 
 interface Table {
@@ -136,6 +137,23 @@ export default function PDATerminal({ tenantSlug = 'barpaco' }: { tenantSlug?: s
   };
 
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+  const addNoteToItem = (productId: string, note: string) => {
+    setCart((prevCart) =>
+      prevCart.map((item) =>
+        item.id === productId ? { ...item, note: note || undefined } : item
+      )
+    );
+  };
+
+  const handleAddNote = (productId: string) => {
+    const item = cart.find((i) => i.id === productId);
+    if (!item) return;
+    const note = prompt(`Observación para ${item.name}:`, item.note || '');
+    if (note !== null) {
+      addNoteToItem(productId, note.trim());
+    }
+  };
 
   const filteredProducts = selectedCategoryId === 'ALL'
     ? products
@@ -277,7 +295,7 @@ export default function PDATerminal({ tenantSlug = 'barpaco' }: { tenantSlug?: s
 
   if (isLoading) {
     return (
-      <div className="flex flex-col min-h-screen bg-slate-900 text-slate-100 font-sans max-w-md mx-auto shadow-2xl items-center justify-center">
+      <div className="flex flex-col min-h-screen bg-slate-900 text-slate-100 font-sans w-full max-w-md mx-auto shadow-2xl items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
         <p className="text-slate-400 font-semibold">Cargando base de datos...</p>
       </div>
@@ -287,7 +305,7 @@ export default function PDATerminal({ tenantSlug = 'barpaco' }: { tenantSlug?: s
   // PANTALLA DE BLOQUEO / TECLADO PIN
   if (!currentWaiter) {
     return (
-      <div className="flex flex-col min-h-screen bg-slate-900 text-slate-100 font-sans max-w-md mx-auto shadow-2xl p-6 justify-center">
+      <div className="flex flex-col min-h-screen bg-slate-900 text-slate-100 font-sans w-full max-w-md mx-auto shadow-2xl p-6 justify-center">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-black tracking-tight text-white mb-1">{tenantName}</h1>
           <p className="text-blue-400 font-extrabold uppercase text-xs tracking-widest">Acceso Camarero</p>
@@ -371,7 +389,7 @@ export default function PDATerminal({ tenantSlug = 'barpaco' }: { tenantSlug?: s
 
   // PANTALLA PRINCIPAL / COMANDERO
   return (
-    <div className="flex flex-col min-h-screen bg-slate-900 text-slate-100 font-sans max-w-md mx-auto shadow-2xl">
+    <div className="flex flex-col min-h-screen bg-slate-900 text-slate-100 font-sans w-full max-w-md mx-auto shadow-2xl">
       {/* Cabecera */}
       <header className="bg-blue-600 px-4 py-3 flex items-center justify-between shadow-md">
         <div>
@@ -455,10 +473,15 @@ export default function PDATerminal({ tenantSlug = 'barpaco' }: { tenantSlug?: s
               <div className="space-y-3">
                 {/* Desglose de productos */}
                 <div className="max-h-32 overflow-y-auto space-y-1.5 pr-1 text-xs">
-                  {billDetails.items.map((item) => (
-                    <div key={item.id} className="flex justify-between text-slate-350">
-                      <span>{item.quantity}x {item.name}</span>
-                      <span className="font-semibold text-slate-200">{(item.price * item.quantity).toFixed(2)}€</span>
+                  {billDetails.items.map((item, idx) => (
+                    <div key={idx} className="flex flex-col text-slate-350 border-b border-slate-900/40 pb-1">
+                      <div className="flex justify-between">
+                        <span>{item.quantity}x {item.name}</span>
+                        <span className="font-semibold text-slate-200">{(item.price * item.quantity).toFixed(2)}€</span>
+                      </div>
+                      {item.note && (
+                        <span className="text-amber-400 text-[10px] italic pl-2">↳ {item.note}</span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -577,10 +600,23 @@ export default function PDATerminal({ tenantSlug = 'barpaco' }: { tenantSlug?: s
               </div>
             ) : (
               cart.map((item) => (
-                <div key={item.id} className="flex items-center justify-between py-1 border-b border-slate-800/60">
+                <div key={item.id} className="flex items-center justify-between py-2 border-b border-slate-800/60 gap-3">
                   <div className="flex-1">
-                    <span className="font-bold text-white">{item.name}</span>
-                    <span className="text-slate-400 text-xs block">
+                    <div className="flex flex-col">
+                      <span className="font-bold text-white text-sm">{item.name}</span>
+                      {item.note && (
+                        <span className="text-amber-400 text-[11px] font-semibold mt-0.5 bg-amber-500/10 px-2 py-0.5 rounded w-fit border border-amber-500/25">
+                          ✍️ {item.note}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => handleAddNote(item.id)}
+                        className="text-[10px] text-blue-400 hover:text-blue-300 font-bold mt-1 text-left underline"
+                      >
+                        {item.note ? 'Editar nota' : 'Agregar observación...'}
+                      </button>
+                    </div>
+                    <span className="text-slate-400 text-xs mt-1 block">
                       {item.quantity} x {item.price.toFixed(2)}€
                     </span>
                   </div>

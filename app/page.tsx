@@ -15,7 +15,6 @@ export default function LandingPage() {
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
               <span className="text-2xl font-black bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent tracking-tight">Comandeo</span>
-              <span className="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-[10px] font-black rounded uppercase tracking-wider">Cloud</span>
             </div>
           </div>
         </div>
