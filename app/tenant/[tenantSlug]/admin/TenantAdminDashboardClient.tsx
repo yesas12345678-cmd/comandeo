@@ -362,7 +362,7 @@ export default function TenantAdminDashboardClient({ tenantSlug, bypassAuth = fa
                 type="text"
                 value={usernameInput}
                 onChange={(e) => setUsernameInput(e.target.value)}
-                placeholder="Ej. admin"
+                placeholder=""
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                 required
               />
