@@ -2,8 +2,30 @@ import React from 'react';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Comandeo | El TPV Móvil Definitivo para tu Restaurante',
+  title: 'Comandeo | El Comandero Digital y TPV Móvil para Restaurantes',
   description: 'Digitaliza las comandas de tu bar, envía tickets directamente a cocina en tiempo real e incrementa la velocidad de tu servicio con nuestra PDA en la nube.',
+  openGraph: {
+    title: 'Comandeo | El Comandero Digital y TPV Móvil para Restaurantes',
+    description: 'Digitaliza las comandas de tu bar, envía tickets directamente a cocina en tiempo real e incrementa la velocidad de tu servicio con nuestra PDA en la nube.',
+    url: 'https://comandeo.app',
+    siteName: 'Comandeo',
+    locale: 'es_ES',
+    type: 'website',
+    images: [
+      {
+        url: 'https://comandeo.app/logo.svg',
+        width: 512,
+        height: 512,
+        alt: 'Comandeo Logo',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Comandeo | El Comandero Digital y TPV Móvil para Restaurantes',
+    description: 'Digitaliza las comandas de tu bar, envía tickets directamente a cocina en tiempo real e incrementa la velocidad de tu servicio con nuestra PDA en la nube.',
+    images: ['https://comandeo.app/logo.svg'],
+  },
 };
 
 export default function LandingPage() {
@@ -104,7 +126,7 @@ export default function LandingPage() {
               </div>
               <h3 className="text-lg font-bold text-white mb-2">Interfaz Táctil Rápida</h3>
               <p className="text-slate-400 text-sm leading-relaxed">
-                Navega cómodamente por carpetas de categorías, añade productos al carrito y selecciona mesas en un desplegable instantáneo.
+                Navega cómodamente por carpetas de categorías, añade productos al carrito y gestiona mesas desde un grid visual e interactivo de un solo toque.
               </p>
             </div>
 
