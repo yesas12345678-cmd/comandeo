@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 
 async function main() {
@@ -21,7 +22,7 @@ async function main() {
       slug: 'barpaco',
       apiKey: 'key_barpaco_test_123',
       adminUsername: 'admin',
-      adminPassword: 'paco123',
+      adminPassword: bcrypt.hashSync('paco123', 10),
     },
   });
 
@@ -220,8 +221,8 @@ async function main() {
   // Camareros para Bar Paco
   await prisma.waiter.createMany({
     data: [
-      { name: 'Carlos', pin: '1111', tenantId: tenantPaco.id },
-      { name: 'María', pin: '2222', tenantId: tenantPaco.id },
+      { name: 'Carlos', pin: bcrypt.hashSync('1111', 10), tenantId: tenantPaco.id },
+      { name: 'María', pin: bcrypt.hashSync('2222', 10), tenantId: tenantPaco.id },
     ],
   });
 
@@ -235,7 +236,7 @@ async function main() {
       slug: 'barpepe',
       apiKey: 'key_barpepe_test_456',
       adminUsername: 'admin',
-      adminPassword: 'pepe123',
+      adminPassword: bcrypt.hashSync('pepe123', 10),
     },
   });
 
@@ -273,8 +274,8 @@ async function main() {
   console.log('Creando Camareros para Taberna Pepe...');
   await prisma.waiter.createMany({
     data: [
-      { name: 'Juan', pin: '3333', tenantId: tenantPepe.id },
-      { name: 'Laura', pin: '4444', tenantId: tenantPepe.id },
+      { name: 'Juan', pin: bcrypt.hashSync('3333', 10), tenantId: tenantPepe.id },
+      { name: 'Laura', pin: bcrypt.hashSync('4444', 10), tenantId: tenantPepe.id },
     ],
   });
 

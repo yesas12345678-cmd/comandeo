@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
@@ -67,16 +68,28 @@ export async function PUT(
     const body = await request.json();
     const { name, pin, allowedDays, startHour, endHour } = body;
 
-    // Si se actualiza el PIN, verificar que no esté duplicado en este restaurante
-    if (pin && pin !== waiter.pin) {
-      if (pin.length !== 4 || isNaN(Number(pin))) {
-        return NextResponse.json({ success: false, error: 'El PIN debe ser de 4 números.' }, { status: 400 });
-      }
-      const existing = await prisma.waiter.findFirst({
-        where: { tenantId: tenant.id, pin, NOT: { id } }
-      });
-      if (existing) {
-        return NextResponse.json({ success: false, error: 'Este PIN ya está asignado a otro camarero.' }, { status: 400 });
+    let hashedPin = waiter.pin;
+    if (pin) {
+      const isSamePin = waiter.pin.startsWith('$2a$') || waiter.pin.startsWith('$2b$')
+        ? await bcrypt.compare(pin, waiter.pin)
+        : pin === waiter.pin;
+        
+      if (!isSamePin) {
+        if (pin.length !== 4 || isNaN(Number(pin))) {
+          return NextResponse.json({ success: false, error: 'El PIN debe ser de 4 números.' }, { status: 400 });
+        }
+        const otherWaiters = await prisma.waiter.findMany({
+          where: { tenantId: tenant.id, NOT: { id } }
+        });
+        for (const w of otherWaiters) {
+          const pinMatches = w.pin.startsWith('$2a$') || w.pin.startsWith('$2b$')
+            ? await bcrypt.compare(pin, w.pin)
+            : w.pin === pin;
+          if (pinMatches) {
+            return NextResponse.json({ success: false, error: 'Este PIN ya está asignado a otro camarero.' }, { status: 400 });
+          }
+        }
+        hashedPin = await bcrypt.hash(pin, 10);
       }
     }
 
@@ -84,7 +97,7 @@ export async function PUT(
       where: { id },
       data: {
         name: name !== undefined ? name : waiter.name,
-        pin: pin !== undefined ? pin : waiter.pin,
+        pin: hashedPin,
         allowedDays: allowedDays !== undefined ? allowedDays : waiter.allowedDays,
         startHour: startHour !== undefined ? startHour : waiter.startHour,
         endHour: endHour !== undefined ? endHour : waiter.endHour,

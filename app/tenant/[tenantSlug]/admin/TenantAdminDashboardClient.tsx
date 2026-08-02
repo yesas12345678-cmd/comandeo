@@ -85,10 +85,18 @@ export default function TenantAdminDashboardClient({ tenantSlug, bypassAuth = fa
   useEffect(() => {
     if (bypassAuth) {
       setIsAuthorized(true);
-    } else {
-      const isLogged = sessionStorage.getItem(`tenant_auth_${tenantSlug}`) === 'true';
-      setIsAuthorized(isLogged);
+      return;
     }
+    async function checkAuth() {
+      try {
+        const res = await fetch(`/api/admin/auth/check-tenant?slug=${encodeURIComponent(tenantSlug)}`);
+        const data = await res.json();
+        setIsAuthorized(data.success);
+      } catch (err) {
+        setIsAuthorized(false);
+      }
+    }
+    checkAuth();
   }, [tenantSlug, bypassAuth]);
 
   // Limpiar mensajes al cambiar de pestaña
@@ -169,7 +177,6 @@ export default function TenantAdminDashboardClient({ tenantSlug, bypassAuth = fa
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        sessionStorage.setItem(`tenant_auth_${tenantSlug}`, 'true');
         setIsAuthorized(true);
       } else {
         setLoginError(data.error || 'Credenciales incorrectas.');
@@ -341,8 +348,12 @@ export default function TenantAdminDashboardClient({ tenantSlug, bypassAuth = fa
     }
   };
 
-  const handleLogout = () => {
-    sessionStorage.removeItem(`tenant_auth_${tenantSlug}`);
+  const handleLogout = async () => {
+    try {
+      await fetch(`/api/admin/auth/logout?slug=${encodeURIComponent(tenantSlug)}`, { method: 'POST' });
+    } catch (err) {
+      console.error('Error logging out:', err);
+    }
     setIsAuthorized(false);
   };
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
@@ -46,19 +47,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'El PIN debe ser de 4 números.' }, { status: 400 });
     }
 
-    // Verificar que el PIN no esté duplicado en este restaurante
-    const existing = await prisma.waiter.findFirst({
-      where: { tenantId: tenant.id, pin }
+    // Verificar que el PIN no esté duplicado en este restaurante (comparando hashes en memoria)
+    const waiters = await prisma.waiter.findMany({
+      where: { tenantId: tenant.id }
     });
 
-    if (existing) {
-      return NextResponse.json({ success: false, error: 'Este código PIN ya está asignado a otro camarero.' }, { status: 400 });
+    for (const w of waiters) {
+      const pinMatches = w.pin.startsWith('$2a$') || w.pin.startsWith('$2b$')
+        ? await bcrypt.compare(pin, w.pin)
+        : w.pin === pin;
+        
+      if (pinMatches) {
+        return NextResponse.json({ success: false, error: 'Este código PIN ya está asignado a otro camarero.' }, { status: 400 });
+      }
     }
+
+    const hashedPin = await bcrypt.hash(pin, 10);
 
     const waiter = await prisma.waiter.create({
       data: {
         name,
-        pin,
+        pin: hashedPin,
         tenantId: tenant.id,
       },
     });

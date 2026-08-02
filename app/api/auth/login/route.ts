@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
@@ -34,8 +35,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Camarero no encontrado.' }, { status: 404 });
     }
 
-    // Verificar si el PIN coincide
-    if (waiter.pin !== pin) {
+    // Verificar si el PIN coincide (soporta texto plano para retrocompatibilidad, pero usa bcrypt)
+    let isPinCorrect = false;
+    if (waiter.pin.startsWith('$2a$') || waiter.pin.startsWith('$2b$')) {
+      isPinCorrect = await bcrypt.compare(pin, waiter.pin);
+    } else {
+      isPinCorrect = waiter.pin === pin;
+    }
+
+    if (!isPinCorrect) {
       return NextResponse.json({ success: false, error: 'Código PIN incorrecto.' }, { status: 401 });
     }
 

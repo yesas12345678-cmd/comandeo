@@ -43,8 +43,16 @@ export default function GlobalAdminPage() {
 
   // Check superadmin session
   useEffect(() => {
-    const isLogged = sessionStorage.getItem('global_admin_auth') === 'true';
-    setIsSuperAuthorized(isLogged);
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/admin/auth/check-super');
+        const data = await res.json();
+        setIsSuperAuthorized(data.success);
+      } catch (err) {
+        setIsSuperAuthorized(false);
+      }
+    }
+    checkAuth();
   }, []);
 
   // Fetch tenants if authorized
@@ -85,14 +93,23 @@ export default function GlobalAdminPage() {
     }
   }, [selectedTenantSlug, tenants]);
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (usernameInput === 'zVaito' && passwordInput === 'Manuel1214$') {
-      sessionStorage.setItem('global_admin_auth', 'true');
-      setIsSuperAuthorized(true);
-      setLoginError('');
-    } else {
-      setLoginError('Usuario o contraseña incorrectos.');
+    try {
+      const res = await fetch('/api/admin/auth/super-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: usernameInput, password: passwordInput })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setIsSuperAuthorized(true);
+        setLoginError('');
+      } else {
+        setLoginError(data.error || 'Usuario o contraseña incorrectos.');
+      }
+    } catch (err) {
+      setLoginError('Error de conexión.');
     }
   };
 
@@ -145,8 +162,12 @@ export default function GlobalAdminPage() {
     }
   };
 
-  const handleLogout = () => {
-    sessionStorage.removeItem('global_admin_auth');
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/admin/auth/logout', { method: 'POST' });
+    } catch (err) {
+      console.error('Error logging out:', err);
+    }
     setIsSuperAuthorized(false);
   };
 
